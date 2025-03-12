@@ -1,5 +1,8 @@
 import { parseTokens } from "./utils/utils.js";
 import ClientAgent from "./utils/ClientAgent.js";
+import { baseOptionSelection, baseOptionCollection } from "./utils/utils.js";
+import  GoPickUp  from "./utils/plans/GoPickUp.js";
+
 function init() {
     singleAgent();
 }
@@ -9,7 +12,10 @@ function singleAgent(config) {
     console.log({token})
     const clientAgent = new ClientAgent({
         token: token, 
-        config: config
+        config: config,
+        collectOptionsLogic: baseOptionCollection,
+        selectOptionLogic: baseOptionSelection,
+        plans: undefined,
     }); //PARAMETERS ARE WIP, config is WIP
     clientAgent.intentionExectuionBusyWaiting();
 }

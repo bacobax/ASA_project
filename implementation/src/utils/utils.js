@@ -21,8 +21,7 @@ export function parseTokens(n_required) {
             console.error("Not enough tokens provided in cmd line arguments");
             return null;
         } else {
-            result_tokens = cmd_tokens.slice(0, n_required);
-            return result_tokens;
+            return cmd_tokens.slice(0, n_required);
         }
     } else {
         if (result_tokens.length < n_required) {
