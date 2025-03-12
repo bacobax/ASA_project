@@ -13,22 +13,21 @@ export function process_cmd_args(requested_args) {
 }
 
 export function parseTokens(n_required) {
-    tokens = config.tokens;
-    cmd_tokens = process_cmd_args(["-token="]);
-    if (processed_token.length >= 1) {
-        if (processed_token.length < n_required) {
+    const tokens = config.tokens;
+    const cmd_tokens = process_cmd_args(["-token="]);
+    if (cmd_tokens.length >= 1) {
+        if (cmd_tokens.length < n_required) {
             console.error("Not enough tokens provided in cmd line arguments");
             return;
         } else {
-            tokens = processed_token.slice(0, n_required);
-            return tokens;
+            return cmd_tokens.slice(0, n_required);
         }
     } else {
         if (tokens.length < n_required) {
             console.error("Not enough tokens provided in config file");
             return;
         } else {
-            tokens = tokens.slice(0, n_required);
+            return tokens.slice(0, n_required);
         }
     }
 }
