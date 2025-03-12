@@ -52,13 +52,14 @@ export const baseOptionCollection = (KB) => {
     return options;
 };
 
-export const baseOptionSelection = (options) => {
+export const baseOptionSelection = (options, KB) => {
     let best_option;
+    
     let nearest_distance = Number.MAX_VALUE;
     for (const option of options) {
         if (option.desire != "go_pick_up") continue;
-        const [parcel] = option;
-        const distance_to_option = distance(me, parcel);
+        const parcel = option;
+        const distance_to_option = distance(KB.me, parcel);
         if (distance_to_option < nearest_distance) {
             best_option = option;
             nearest_distance = distance_to_option;

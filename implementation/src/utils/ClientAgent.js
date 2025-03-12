@@ -59,7 +59,7 @@ export default class ClientAgent {
             const options = collectOptions(this._knowledgeBase);
             console.log("OPTIONS: ", options);
 
-            const bestOPT = selectOption(options);
+            const bestOPT = selectOption(options, this._knowledgeBase);
 
             if (bestOPT) {
                 this._agent.queue(bestOPT.desire, ...bestOPT.args);
