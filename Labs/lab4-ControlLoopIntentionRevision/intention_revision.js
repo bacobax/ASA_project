@@ -1,57 +1,64 @@
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
+import { default as config } from "../config.js";
 
-const client = new DeliverooApi(
-    'http://localhost:8080',''
-    // 'https://deliveroojs.onrender.com'
-    // 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwNmI5MTZkZWYwIiwibmFtZSI6Im1hcmNvIiwiaWF0IjoxNjk2OTM5OTQyfQ.oILtKDtT-CjZxdnNYOEAB7F_zjstNzUVCxUWphx9Suw'
-)
+let token = config.token;
 
-function distance( {x:x1, y:y1}, {x:x2, y:y2}) {
-    const dx = Math.abs( Math.round(x1) - Math.round(x2) )
-    const dy = Math.abs( Math.round(y1) - Math.round(y2) )
-    return dx + dy;
+function process_cmd_args() {
+    process.argv.forEach(function (val, index, array) {
+        if (val.startsWith("-token=")) {
+            token = val.split("=")[1];
+        }
+    });
 }
 
+const client = new DeliverooApi(
+    "http://localhost:8080",
+    token
+    // 'https://deliveroojs.onrender.com'
+    // 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwNmI5MTZkZWYwIiwibmFtZSI6Im1hcmNvIiwiaWF0IjoxNjk2OTM5OTQyfQ.oILtKDtT-CjZxdnNYOEAB7F_zjstNzUVCxUWphx9Suw'
+);
 
+function distance({ x: x1, y: y1 }, { x: x2, y: y2 }) {
+    const dx = Math.abs(Math.round(x1) - Math.round(x2));
+    const dy = Math.abs(Math.round(y1) - Math.round(y2));
+    return dx + dy;
+}
 
 /**
  * Beliefset revision function
  */
 const me = {};
-client.onYou( ( {id, name, x, y, score} ) => {
-    me.id = id
-    me.name = name
-    me.x = x
-    me.y = y
-    me.score = score
-} )
+client.onYou(({ id, name, x, y, score }) => {
+    me.id = id;
+    me.name = name;
+    me.x = x;
+    me.y = y;
+    me.score = score;
+});
 const parcels = new Map();
-client.onParcelsSensing( async ( perceived_parcels ) => {
+client.onParcelsSensing(async (perceived_parcels) => {
     for (const p of perceived_parcels) {
-        parcels.set( p.id, p)
+        parcels.set(p.id, p);
     }
-} )
-client.onConfig( (param) => {
+});
+client.onConfig((param) => {
     // console.log(param);
-} )
-
-
+});
 
 /**
  * Options generation and filtering function
  */
-client.onParcelsSensing( parcels => {
-
+client.onParcelsSensing((parcels) => {
     // TODO revisit beliefset revision so to trigger option generation only in the case a new parcel is observed
 
     /**
      * Options generation
      */
-    const options = []
+    const options = [];
     for (const parcel of parcels.values())
-        if ( ! parcel.carriedBy )
-            options.push( [ 'go_pick_up', parcel.x, parcel.y, parcel.id ] );
-            // myAgent.push( [ 'go_pick_up', parcel.x, parcel.y, parcel.id ] )
+        if (!parcel.carriedBy)
+            options.push(["go_pick_up", parcel.x, parcel.y, parcel.id]);
+    // myAgent.push( [ 'go_pick_up', parcel.x, parcel.y, parcel.id ] )
 
     /**
      * Options filtering
@@ -59,12 +66,12 @@ client.onParcelsSensing( parcels => {
     let best_option;
     let nearest = Number.MAX_VALUE;
     for (const option of options) {
-        if ( option[0] == 'go_pick_up' ) {
-            let [go_pick_up,x,y,id] = option;
-            let current_d = distance( {x, y}, me )
-            if ( current_d < nearest ) {
-                best_option = option
-                nearest = current_d
+        if (option[0] == "go_pick_up") {
+            let [go_pick_up, x, y, id] = option;
+            let current_d = distance({ x, y }, me);
+            if (current_d < nearest) {
+                best_option = option;
+                nearest = current_d;
             }
         }
     }
@@ -72,144 +79,142 @@ client.onParcelsSensing( parcels => {
     /**
      * Best option is selected
      */
-    if ( best_option )
-        myAgent.push( best_option )
-
-} )
+    if (best_option) myAgent.push(best_option);
+});
 // client.onAgentsSensing( agentLoop )
 // client.onYou( agentLoop )
-
-
 
 /**
  * Intention revision loop
  */
 class IntentionRevision {
-
     #intention_queue = new Array();
-    get intention_queue () {
+    get intention_queue() {
         return this.#intention_queue;
     }
 
-    async loop ( ) {
-        while ( true ) {
+    async loop() {
+        console.log("intentionRevision.loop started");
+        while (true) {
             // Consumes intention_queue if not empty
-            if ( this.intention_queue.length > 0 ) {
-                console.log( 'intentionRevision.loop', this.intention_queue.map(i=>i.predicate) );
-            
+            if (this.intention_queue.length > 0) {
+                console.log(
+                    "intentionRevision.loop",
+                    this.intention_queue.map((i) => i.predicate)
+                );
+
                 // Current intention
                 const intention = this.intention_queue[0];
-                
+
                 // Is queued intention still valid? Do I still want to achieve it?
                 // TODO this hard-coded implementation is an example
-                let id = intention.predicate[2]
-                let p = parcels.get(id)
-                if ( p && p.carriedBy ) {
-                    console.log( 'Skipping intention because no more valid', intention.predicate )
+                let id = intention.predicate[2];
+                let p = parcels.get(id);
+                if (p && p.carriedBy) {
+                    console.log(
+                        "Skipping intention because no more valid",
+                        intention.predicate
+                    );
                     continue;
                 }
 
                 // Start achieving intention
-                await intention.achieve()
-                // Catch eventual error and continue
-                .catch( error => {
-                    // console.log( 'Failed intention', ...intention.predicate, 'with error:', ...error )
-                } );
+                await intention
+                    .achieve()
+                    // Catch eventual error and continue
+                    .catch((error) => {
+                        console.log(
+                            "Failed intention",
+                            ...intention.predicate,
+                            "with error:",
+                            error
+                        );
+                    });
 
                 // Remove from the queue
                 this.intention_queue.shift();
             }
             // Postpone next iteration at setImmediate
-            await new Promise( res => setImmediate( res ) );
+            await new Promise((res) => setImmediate(res));
         }
     }
 
     // async push ( predicate ) { }
 
-    log ( ...args ) {
-        console.log( ...args )
+    log(...args) {
+        console.log(...args);
     }
-
 }
 
 class IntentionRevisionQueue extends IntentionRevision {
-
-    async push ( predicate ) {
-        
+    async push(predicate) {
         // Check if already queued
-        if ( this.intention_queue.find( (i) => i.predicate.join(' ') == predicate.join(' ') ) )
+        if (
+            this.intention_queue.find(
+                (i) => i.predicate.join(" ") == predicate.join(" ")
+            )
+        )
             return; // intention is already queued
 
-        console.log( 'IntentionRevisionReplace.push', predicate );
-        const intention = new Intention( this, predicate );
-        this.intention_queue.push( intention );
+        console.log("IntentionRevisionQueue.push", predicate);
+        const intention = new Intention(this, predicate);
+        this.intention_queue.push(intention);
     }
-
 }
 
 class IntentionRevisionReplace extends IntentionRevision {
-
-    async push ( predicate ) {
-
+    async push(predicate) {
         // Check if already queued
-        const last = this.intention_queue.at( this.intention_queue.length - 1 );
-        if ( last && last.predicate.join(' ') == predicate.join(' ') ) {
+        const last = this.intention_queue.at(this.intention_queue.length - 1);
+        if (last && last.predicate.join(" ") == predicate.join(" ")) {
             return; // intention is already being achieved
         }
-        
-        console.log( 'IntentionRevisionReplace.push', predicate );
-        const intention = new Intention( this, predicate );
-        this.intention_queue.push( intention );
-        
-        // Force current intention stop 
-        if ( last ) {
+
+        console.log("IntentionRevisionReplace.push", predicate);
+        const intention = new Intention(this, predicate);
+        this.intention_queue.push(intention);
+
+        // Force current intention stop
+        if (last) {
             last.stop();
         }
     }
-
 }
 
 class IntentionRevisionRevise extends IntentionRevision {
-
-    async push ( predicate ) {
-        console.log( 'Revising intention queue. Received', ...predicate );
+    async push(predicate) {
+        console.log("Revising intention queue. Received", ...predicate);
         // TODO
         // - order intentions based on utility function (reward - cost) (for example, parcel score minus distance)
         // - eventually stop current one
         // - evaluate validity of intention
     }
-
 }
 
 /**
  * Start intention revision loop
  */
 
-// const myAgent = new IntentionRevisionQueue();
-const myAgent = new IntentionRevisionReplace();
+const myAgent = new IntentionRevisionQueue();
+//const myAgent = new IntentionRevisionReplace();
 // const myAgent = new IntentionRevisionRevise();
-myAgent.loop();
-
-
 
 /**
  * Intention
  */
 class Intention {
-
-    // Plan currently used for achieving the intention 
+    // Plan currently used for achieving the intention
     #current_plan;
-    
+
     // This is used to stop the intention
     #stopped = false;
-    get stopped () {
+    get stopped() {
         return this.#stopped;
     }
-    stop () {
+    stop() {
         // this.log( 'stop intention', ...this.#predicate );
         this.#stopped = true;
-        if ( this.#current_plan)
-            this.#current_plan.stop();
+        if (this.#current_plan) this.#current_plan.stop();
     }
 
     /**
@@ -220,66 +225,84 @@ class Intention {
     /**
      * predicate is in the form ['go_to', x, y]
      */
-    get predicate () {
+    get predicate() {
         return this.#predicate;
     }
     #predicate;
 
-    constructor ( parent, predicate ) {
+    constructor(parent, predicate) {
         this.#parent = parent;
         this.#predicate = predicate;
     }
 
-    log ( ...args ) {
-        if ( this.#parent && this.#parent.log )
-            this.#parent.log( '\t', ...args )
-        else
-            console.log( ...args )
+    log(...args) {
+        if (this.#parent && this.#parent.log) this.#parent.log("\t", ...args);
+        else console.log(...args);
     }
 
     #started = false;
     /**
      * Using the plan library to achieve an intention
      */
-    async achieve () {
+    async achieve() {
+        console.log("start achieving intention", ...this.predicate);
         // Cannot start twice
-        if ( this.#started)
+        if (this.#started) {
+            console.log("Already started");
             return this;
-        else
-            this.#started = true;
+        } else this.#started = true;
 
         // Trying all plans in the library
         for (const planClass of planLibrary) {
-
+            console.log("trying plan", planClass.name);
             // if stopped then quit
-            if ( this.stopped ) throw [ 'stopped intention', ...this.predicate ];
+            if (this.stopped) throw ["stopped intention", ...this.predicate];
 
             // if plan is 'statically' applicable
-            if ( planClass.isApplicableTo( ...this.predicate ) ) {
+            if (planClass.isApplicableTo(...this.predicate)) {
                 // plan is instantiated
                 this.#current_plan = new planClass(this.parent);
-                this.log('achieving intention', ...this.predicate, 'with plan', planClass.name);
+                this.log(
+                    "achieving intention",
+                    ...this.predicate,
+                    "with plan",
+                    planClass.name
+                );
                 // and plan is executed and result returned
                 try {
-                    const plan_res = await this.#current_plan.execute( ...this.predicate );
-                    this.log( 'succesful intention', ...this.predicate, 'with plan', planClass.name, 'with result:', plan_res );
-                    return plan_res
-                // or errors are caught so to continue with next plan
+                    const plan_res = await this.#current_plan.execute(
+                        ...this.predicate
+                    );
+                    this.log(
+                        "succesful intention",
+                        ...this.predicate,
+                        "with plan",
+                        planClass.name,
+                        "with result:",
+                        plan_res
+                    );
+                    return plan_res;
+                    // or errors are caught so to continue with next plan
                 } catch (error) {
-                    this.log( 'failed intention', ...this.predicate,'with plan', planClass.name, 'with error:', ...error );
+                    this.log(
+                        "failed intention",
+                        ...this.predicate,
+                        "with plan",
+                        planClass.name,
+                        "with error:",
+                        ...error
+                    );
                 }
             }
-
         }
 
         // if stopped then quit
-        if ( this.stopped ) throw [ 'stopped intention', ...this.predicate ];
+        if (this.stopped) throw ["stopped intention", ...this.predicate];
 
         // no plans have been found to satisfy the intention
         // this.log( 'no plan satisfied the intention ', ...this.predicate );
-        throw ['no plan satisfied the intention ', ...this.predicate ]
+        throw ["no plan satisfied the intention ", ...this.predicate];
     }
-
 }
 
 /**
@@ -288,17 +311,20 @@ class Intention {
 const planLibrary = [];
 
 class Plan {
-
+    #name = "";
+    get name() {
+        return this.#name;
+    }
     // This is used to stop the plan
     #stopped = false;
-    stop () {
+    stop() {
         // this.log( 'stop plan' );
         this.#stopped = true;
-        for ( const i of this.#sub_intentions ) {
+        for (const i of this.#sub_intentions) {
             i.stop();
         }
     }
-    get stopped () {
+    get stopped() {
         return this.#stopped;
     }
 
@@ -307,102 +333,91 @@ class Plan {
      */
     #parent;
 
-    constructor ( parent ) {
+    constructor(parent) {
         this.#parent = parent;
     }
 
-    log ( ...args ) {
-        if ( this.#parent && this.#parent.log )
-            this.#parent.log( '\t', ...args )
-        else
-            console.log( ...args )
+    log(...args) {
+        if (this.#parent && this.#parent.log) this.#parent.log("\t", ...args);
+        else console.log(...args);
     }
 
     // this is an array of sub intention. Multiple ones could eventually being achieved in parallel.
     #sub_intentions = [];
 
-    async subIntention ( predicate ) {
-        const sub_intention = new Intention( this, predicate );
-        this.#sub_intentions.push( sub_intention );
+    async subIntention(predicate) {
+        const sub_intention = new Intention(this, predicate);
+        this.#sub_intentions.push(sub_intention);
         return await sub_intention.achieve();
     }
-
 }
 
 class GoPickUp extends Plan {
-
-    static isApplicableTo ( go_pick_up, x, y, id ) {
-        return go_pick_up == 'go_pick_up';
+    #name = "GoPickUp";
+    static isApplicableTo(go_pick_up, x, y, id) {
+        return go_pick_up == "go_pick_up";
     }
 
-    async execute ( go_pick_up, x, y ) {
-        if ( this.stopped ) throw ['stopped']; // if stopped then quit
-        await this.subIntention( ['go_to', x, y] );
-        if ( this.stopped ) throw ['stopped']; // if stopped then quit
-        await client.pickup()
-        if ( this.stopped ) throw ['stopped']; // if stopped then quit
+    async execute(go_pick_up, x, y) {
+        if (this.stopped) throw ["stopped"]; // if stopped then quit
+        await this.subIntention(["go_to", x, y]);
+        if (this.stopped) throw ["stopped"]; // if stopped then quit
+        await client.pickup();
+        if (this.stopped) throw ["stopped"]; // if stopped then quit
         return true;
     }
-
 }
 
 class BlindMove extends Plan {
-
-    static isApplicableTo ( go_to, x, y ) {
-        return go_to == 'go_to';
+    #name = "BlindMove";
+    static isApplicableTo(go_to, x, y) {
+        return go_to == "go_to";
     }
 
-    async execute ( go_to, x, y ) {
-
-        while ( me.x != x || me.y != y ) {
-
-            if ( this.stopped ) throw ['stopped']; // if stopped then quit
+    async execute(go_to, x, y) {
+        while (me.x != x || me.y != y) {
+            if (this.stopped) throw ["stopped"]; // if stopped then quit
 
             let status_x = false;
             let status_y = false;
-            
+
             // this.log('me', me, 'xy', x, y);
 
-            if ( x > me.x )
-                status_x = await client.move('right')
-                // status_x = await this.subIntention( 'go_to', {x: me.x+1, y: me.y} );
-            else if ( x < me.x )
-                status_x = await client.move('left')
-                // status_x = await this.subIntention( 'go_to', {x: me.x-1, y: me.y} );
+            if (x > me.x) status_x = await client.move("right");
+            // status_x = await this.subIntention( 'go_to', {x: me.x+1, y: me.y} );
+            else if (x < me.x) status_x = await client.move("left");
+            // status_x = await this.subIntention( 'go_to', {x: me.x-1, y: me.y} );
 
             if (status_x) {
                 me.x = status_x.x;
                 me.y = status_x.y;
             }
 
-            if ( this.stopped ) throw ['stopped']; // if stopped then quit
+            if (this.stopped) throw ["stopped"]; // if stopped then quit
 
-            if ( y > me.y )
-                status_y = await client.move('up')
-                // status_x = await this.subIntention( 'go_to', {x: me.x, y: me.y+1} );
-            else if ( y < me.y )
-                status_y = await client.move('down')
-                // status_x = await this.subIntention( 'go_to', {x: me.x, y: me.y-1} );
+            if (y > me.y) status_y = await client.move("up");
+            // status_x = await this.subIntention( 'go_to', {x: me.x, y: me.y+1} );
+            else if (y < me.y) status_y = await client.move("down");
+            // status_x = await this.subIntention( 'go_to', {x: me.x, y: me.y-1} );
 
             if (status_y) {
                 me.x = status_y.x;
                 me.y = status_y.y;
             }
-            
-            if ( ! status_x && ! status_y) {
-                this.log('stucked');
-                throw 'stucked';
-            } else if ( me.x == x && me.y == y ) {
+
+            if (!status_x && !status_y) {
+                this.log("stucked");
+                throw "stucked";
+            } else if (me.x == x && me.y == y) {
                 // this.log('target reached');
             }
-            
         }
 
         return true;
-
     }
 }
 
-// plan classes are added to plan library 
-planLibrary.push( GoPickUp )
-planLibrary.push( BlindMove )
+// plan classes are added to plan library
+planLibrary.push(GoPickUp);
+planLibrary.push(BlindMove);
+myAgent.loop();
