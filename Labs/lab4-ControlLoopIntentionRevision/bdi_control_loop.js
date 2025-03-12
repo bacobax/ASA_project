@@ -1,8 +1,8 @@
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 
 const client = new DeliverooApi(
-    'https://deliveroojs.onrender.com',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMwNmI5MTZkZWYwIiwibmFtZSI6Im1hcmNvIiwiaWF0IjoxNjk2OTM5OTQyfQ.oILtKDtT-CjZxdnNYOEAB7F_zjstNzUVCxUWphx9Suw'
+    'http://localhost:8080',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImYxMjFiODdiZDM1IiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NDE3NzE5NTd9.5SHVk7Moc3zxqro5nZP8u3fsUfULSb22NwyCUcgGy6M'
 )
 
 function distance( {x:x1, y:y1}, {x:x2, y:y2}) {
@@ -26,7 +26,9 @@ client.onYou( ( {id, name, x, y, score} ) => {
     me.score = score
 } )
 const parcels = new Map();
+
 client.onParcelsSensing( async ( perceived_parcels ) => {
+    console.log("UPDATO PARCELS")
     for (const p of perceived_parcels) {
         parcels.set( p.id, p)
     }
@@ -40,6 +42,9 @@ client.onParcelsSensing( async ( perceived_parcels ) => {
 
 function agentLoop() {
     
+
+    console.log("INIZIO AGENT LOOP")
+
     /**
      * Options
      */
@@ -48,7 +53,7 @@ function agentLoop() {
         if ( parcel.carriedBy ) continue;
         options.push( {
             desire: 'go_pick_up',
-            args: [parcel]
+            args: [parcel]  
         } );
     }
 
@@ -59,7 +64,7 @@ function agentLoop() {
     let nearest_distance = Number.MAX_VALUE;
     for ( const option of options ) {
         if ( option.desire != 'go_pick_up' ) continue;
-        let parcel = option.args[0];
+        const [parcel] = option;
         const distance_to_option = distance( me, parcel );
         if ( distance_to_option < nearest_distance ) {
             best_option = option;
@@ -73,8 +78,9 @@ function agentLoop() {
      */
     if ( best_option ) {
         myAgent.queue( best_option.desire, ...best_option.args );
-
+    }
 }
+
 client.onParcelsSensing( agentLoop )
 // client.onAgentsSensing( agentLoop )
 // client.onYou( agentLoop )

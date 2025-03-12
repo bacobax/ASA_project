@@ -54,6 +54,7 @@ io.on('connection', (socket) => {
         else
             socket.emit( 'not_tile', x, y );
     } );
+    
     let tiles = []
     for (const {x, y, delivery, blocked, parcelSpawner} of myGrid.getTiles()) {
         if ( !blocked ) {

@@ -13,22 +13,16 @@ async function start () {
     /**
      *  Start Redis
      */
-    
     if ( redisClient ) {
-
         await redisClient.connect();
-        console.log("Connected to Redis");
-        
+        console.log("Connected to Redis"); 
     } else {
-
         console.log('Redis disabled');
-
     }
 
     /**
      *  Start http server
      */
-
     httpServer.listen( PORT, () => {
         
         console.log(`Server listening on http://localhost:${PORT}`);

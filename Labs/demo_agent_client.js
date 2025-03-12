@@ -14,9 +14,8 @@ async function agentLoop () {
         await client.putdown();
 
         await client.pickup();
-
-        let tried = [];
-
+        const tried = [];
+        //tried è solo un array. Come fa a ricordarsi il tried per ogni casella?
         while ( tried.length < 4 ) {
             
             let current = { up: 'down', right: 'left', down: 'up', left: 'right' }[previous] // backward
@@ -41,7 +40,7 @@ async function agentLoop () {
 
         if ( tried.length == 4 ) {
             console.log( 'stucked' );
-            await client.timer(1000); // stucked, wait 1 sec and retry
+            await client.timer(5000); // stucked, wait 1 sec and retry
         }
 
 

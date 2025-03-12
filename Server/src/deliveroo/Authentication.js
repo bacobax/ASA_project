@@ -99,8 +99,7 @@ class Authentication {
                     id = decoded.id
                     name = decoded.name
                     console.log( `Socket ${socket.id} connected as ${name}(${id}). With token: ...${token.slice(-30)}` );
-                }
-                else {
+                }else{
                     throw `Socket ${socket.id} log in failure. Token is verified but id or name are missing.`
                 }
                 

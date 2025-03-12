@@ -6,7 +6,7 @@ const config = {
     PARCELS_MAX: '5',                  // 'infinite' (DEFAULT)
 
     MOVEMENT_STEPS: 1,                  // default is 1
-    MOVEMENT_DURATION: 50,              // default is 500
+    MOVEMENT_DURATION: 25,              // default is 500
     AGENTS_OBSERVATION_DISTANCE: 5,     // default is 5, supports 'infinite'
     PARCELS_OBSERVATION_DISTANCE: 5,    // default is 5, supports 'infinite' 
     AGENT_TIMEOUT: 10000,               // default is 10000
