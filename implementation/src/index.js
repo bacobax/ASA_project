@@ -1,15 +1,17 @@
-import { parseTokens } from "./utils/utils";
-
-/**
- * Initialize Agent(s) and parse command line arguments
- */
+import { parseTokens } from "./utils/utils.js";
+import ClientAgent from "./utils/ClientAgent.js";
 function init() {
     singleAgent();
 }
 
 function singleAgent(config) {
-    token = parseTokens(1)[0];
-    // const ClientAgent = new ClientAgent(token, config); //PARAMETERS ARE WIP, config is WIP
+    const token = parseTokens(1)[0];
+    console.log({token})
+    const clientAgent = new ClientAgent({
+        token: token, 
+        config: config
+    }); //PARAMETERS ARE WIP, config is WIP
+    clientAgent.intentionExectuionBusyWaiting();
 }
 
 function multiAgent(n_agents, configs) {
@@ -20,7 +22,7 @@ function multiAgent(n_agents, configs) {
         return;
     }
 
-    tokens = parseTokens(n_agents);
+    const tokens = parseTokens(n_agents);
     const agents = [];
     for (let i = 0; i < n_agents; i++) {
         agents

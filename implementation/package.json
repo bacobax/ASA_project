@@ -5,8 +5,9 @@
   "type": "module",
   "main": "index.js",
   "module": "index.js",
+  "strict": true,
   "scripts": {
-    "start": "nodemon index.js",
+    "start": "nodemon src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Marco",

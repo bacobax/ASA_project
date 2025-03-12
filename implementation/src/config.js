@@ -1,9 +1,9 @@
 const config = {
-    host: "http://localhost:8080",
+    host: "http://localhost:8080/",
     //host: "https://deliveroojs.onrender.com",
 
     tokens: [
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjVhYjEzMmMyNDBkIiwibmFtZSI6Ik1VTFRJXzAiLCJpYXQiOjE3NDE3MDA4MDR9.l7xH-n9gXjONaBiOgxkW7NF8ckdGA84pbZlJWUVOTv4",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImYxMjFiODdiZDM1IiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NDE3NzE5NTd9.5SHVk7Moc3zxqro5nZP8u3fsUfULSb22NwyCUcgGy6M",
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImFiMTMyYzI0MGQxIiwibmFtZSI6Ik1VTFRJXzEiLCJpYXQiOjE3NDE3MDA4MDR9.Wiu4GXp9CRKPHYT-A0MdU4kj0I4sWUVMwPpBfVgHaLk",
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImIxMzJjMjQwZDE5IiwibmFtZSI6Ik1VTFRJXzIiLCJpYXQiOjE3NDE3MDA4MDR9.qUs4S6z4K_a9T7A7cVhhibks8u3EZXI1RCOhvaESGyA",
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEzMmMyNDBkMTlmIiwibmFtZSI6Ik1VTFRJXzMiLCJpYXQiOjE3NDE3MDA4MDR9.NaD9dh3b4i4lvLFiganeqlZKBq_lvOshXk_Hss_-mYI",

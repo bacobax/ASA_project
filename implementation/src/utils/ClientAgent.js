@@ -1,7 +1,6 @@
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import { distance, process_cmd_args } from "./utils/utils";
-import { default as config } from "../config.js";
-import { Agent } from "./utils/agent";
+import config from "../config.js";
+import  Agent  from "./Agent.js";
 
 /**
  *  Class for ClientAgent,
@@ -16,12 +15,13 @@ export default class ClientAgent {
         parcels: new Map(),
     };
     _plans;
+   
 
     constructor({ token, collectOptionsLogic, selectOptionLogic, plans }) {
-        this._client = new DeliverooApi(config.url, token);
+        this._client = new DeliverooApi(config.host, token);
         this._agent = new Agent();
         this._plans = plans;
-        _initSocket({
+        this._initSocket({
             collectOptions: collectOptionsLogic,
             selectOption: selectOptionLogic,
         });
@@ -38,22 +38,22 @@ export default class ClientAgent {
      * selectOption: function that selects the best option for the agent
      */
     _initSocket({ collectOptions, selectOption }) {
-        _client.onYou(({ id, name, x, y, score }) => {
-            _knowledgeBase.me.id = id;
-            _knowledgeBase.me.name = name;
-            _knowledgeBase.me.x = x;
-            _knowledgeBase.me.y = y;
-            _knowledgeBase.me.score = score;
+        this._client.onYou(({ id, name, x, y, score }) => {
+            this._knowledgeBase.me.id = id;
+            this._knowledgeBase.me.name = name;
+            this._knowledgeBase.me.x = x;
+            this._knowledgeBase.me.y = y;
+            this._knowledgeBase.me.score = score;
         });
 
-        _client.onParcelsSensing(async (perceived_parcels) => {
+        this._client.onParcelsSensing(async (perceived_parcels) => {
             console.log("UPDATO PARCELS");
             for (const p of perceived_parcels) {
                 _knowledgeBase.parcels.set(p.id, p);
             }
         });
 
-        _client.onParcelsSensing(() => {
+        this._client.onParcelsSensing(() => {
             console.log("INIZIO AGENT LOOP");
 
             const options = collectOptions(this._knowledgeBase);
