@@ -1,3 +1,5 @@
+import { default as config } from "../config.js";
+
 export function process_cmd_args(requested_args) {
     let args = [];
     process.argv.forEach(function (val, index, array) {
@@ -8,6 +10,27 @@ export function process_cmd_args(requested_args) {
         });
     });
     return args;
+}
+
+export function parseTokens(n_required) {
+    tokens = config.tokens;
+    cmd_tokens = process_cmd_args(["-token="]);
+    if (processed_token.length >= 1) {
+        if (processed_token.length < n_required) {
+            console.error("Not enough tokens provided in cmd line arguments");
+            return;
+        } else {
+            tokens = processed_token.slice(0, n_required);
+            return tokens;
+        }
+    } else {
+        if (tokens.length < n_required) {
+            console.error("Not enough tokens provided in config file");
+            return;
+        } else {
+            tokens = tokens.slice(0, n_required);
+        }
+    }
 }
 
 export function distance({ x: x1, y: y1 }, { x: x2, y: y2 }) {

@@ -1,17 +1,33 @@
+import { parseTokens } from "./utils/utils";
 
-import { distance, process_cmd_args } from "./utils/utils";
-import { default as config } from "../config.js";
+/**
+ * Initialize Agent(s) and parse command line arguments
+ */
 function init() {
-    /**
-     * Belief revision function
-     */
-    token = config.token;
-    processed_token = process_cmd_args(["-token="]);
-    if (processed_token.length == 1) {
-        token = processed_token[0];
+    singleAgent();
+}
+
+function singleAgent(config) {
+    token = parseTokens(1)[0];
+    // const ClientAgent = new ClientAgent(token, config); //PARAMETERS ARE WIP, config is WIP
+}
+
+function multiAgent(n_agents, configs) {
+    if (n_agents != configs.length) {
+        console.error(
+            "Number of agents and number of configurations do not match"
+        );
+        return;
     }
 
-    const ClientAgent = new ClientAgent(token);
+    tokens = parseTokens(n_agents);
+    const agents = [];
+    for (let i = 0; i < n_agents; i++) {
+        agents
+            .push
+            // new ClientAgent(tokens[i], configs[i]) //PARAMETERS ARE WIP, config is WIP
+            ();
+    }
 }
 
 init();

@@ -3,6 +3,11 @@ import { distance, process_cmd_args } from "./utils/utils";
 import { default as config } from "../config.js";
 import { Agent } from "./utils/agent";
 
+/**
+ *  Class for ClientAgent,
+ *  which is responsible for managing the client, agent and knowledge base
+ *  also manages the initialization of the socket
+ */
 export default class ClientAgent {
     _client;
     _agent;
@@ -22,6 +27,16 @@ export default class ClientAgent {
         });
     }
 
+    /**
+     *
+     * @param {function} collectOptions
+     * @param {function} selectOption
+     * @returns {void}
+     *
+     * initializes the sockets and defines the callbacks for the agent loop
+     * collectOptions: function that collects the options for the agent
+     * selectOption: function that selects the best option for the agent
+     */
     _initSocket({ collectOptions, selectOption }) {
         _client.onYou(({ id, name, x, y, score }) => {
             _knowledgeBase.me.id = id;
