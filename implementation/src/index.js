@@ -1,10 +1,6 @@
-import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
+
 import { distance, process_cmd_args } from "./utils/utils";
 import { default as config } from "../config.js";
-import store from "./store.js";
-import { init_sockets } from "./utils/sockets";
-import { Agent } from "./utils/agent";
-
 function init() {
     /**
      * Belief revision function
