@@ -1,8 +1,13 @@
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
+import config from "./config.js";
+import store from "./store.js";
+
+
+const {host, token} = config;
 
 const client = new DeliverooApi(
-    'http://localhost:8080',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImYxMjFiODdiZDM1IiwibmFtZSI6InRlc3QiLCJpYXQiOjE3NDE3NzE5NTd9.5SHVk7Moc3zxqro5nZP8u3fsUfULSb22NwyCUcgGy6M'
+    host,
+    token
 )
 
 function distance( {x:x1, y:y1}, {x:x2, y:y2}) {
@@ -17,7 +22,10 @@ function distance( {x:x1, y:y1}, {x:x2, y:y2}) {
  * Belief revision function
  */
 
-const me = {};
+const me = store[0].me;
+
+const myAgent = new Agent();
+
 client.onYou( ( {id, name, x, y, score} ) => {
     me.id = id
     me.name = name
@@ -25,7 +33,7 @@ client.onYou( ( {id, name, x, y, score} ) => {
     me.y = y
     me.score = score
 } )
-const parcels = new Map();
+const parcels = store[0].parcels;
 
 client.onParcelsSensing( async ( perceived_parcels ) => {
     console.log("UPDATO PARCELS")
