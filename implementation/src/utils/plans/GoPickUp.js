@@ -1,6 +1,6 @@
 import Plan from "./Plan.js";
 
-export class GoPickUp extends Plan {
+export default class GoPickUp extends Plan {
 
     isApplicableTo ( desire ) {
         return desire == 'go_pick_up';
@@ -13,3 +13,4 @@ export class GoPickUp extends Plan {
     }
 
 }
+

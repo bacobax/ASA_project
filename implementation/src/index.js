@@ -2,7 +2,7 @@ import { parseTokens } from "./utils/utils.js";
 import ClientAgent from "./utils/ClientAgent.js";
 import { baseOptionSelection, baseOptionCollection } from "./utils/utils.js";
 import  GoPickUp  from "./utils/plans/GoPickUp.js";
-
+import BlindMove from "./utils/plans/BlindMove.js";
 function init() {
     singleAgent();
 }
@@ -15,7 +15,7 @@ function singleAgent(config) {
         config: config,
         collectOptionsLogic: baseOptionCollection,
         selectOptionLogic: baseOptionSelection,
-        plans: undefined,
+        plans: [GoPickUp, BlindMove],
     }); //PARAMETERS ARE WIP, config is WIP
     clientAgent.intentionExectuionBusyWaiting();
 }

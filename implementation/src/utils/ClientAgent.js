@@ -49,7 +49,7 @@ export default class ClientAgent {
         this._client.onParcelsSensing(async (perceived_parcels) => {
             console.log("UPDATO PARCELS");
             for (const p of perceived_parcels) {
-                _knowledgeBase.parcels.set(p.id, p);
+                this._knowledgeBase.parcels.set(p.id, p);
             }
         });
 
@@ -57,6 +57,7 @@ export default class ClientAgent {
             console.log("INIZIO AGENT LOOP");
 
             const options = collectOptions(this._knowledgeBase);
+            console.log("OPTIONS: ", options);
 
             const bestOPT = selectOption(options);
 
