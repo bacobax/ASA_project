@@ -15,55 +15,7 @@ function init() {
         token = processed_token[0];
     }
 
-    const client = new DeliverooApi(config.url, token);
-    const myAgent = new Agent();
-
-    client.onParcelsSensing(agentLoop);
+    const ClientAgent = new ClientAgent(token);
 }
-
-/**
- * BDI loop
- */
-
-function agentLoop() {
-    console.log("INIZIO AGENT LOOP");
-
-    /**
-     * Options
-     */
-    const options = [];
-    for (const [id, parcel] of parcels.entries()) {
-        if (parcel.carriedBy) continue;
-        options.push({
-            desire: "go_pick_up",
-            args: [parcel],
-        });
-    }
-
-    /**
-     * Select best intention
-     */
-    let best_option;
-    let nearest_distance = Number.MAX_VALUE;
-    for (const option of options) {
-        if (option.desire != "go_pick_up") continue;
-        const [parcel] = option;
-        const distance_to_option = distance(me, parcel);
-        if (distance_to_option < nearest_distance) {
-            best_option = option;
-            nearest_distance = distance_to_option;
-        }
-    }
-
-    /**
-     * Revise/queue intention
-     */
-    if (best_option) {
-        myAgent.queue(best_option.desire, ...best_option.args);
-    }
-}
-
-// client.onAgentsSensing( agentLoop )
-// client.onYou( agentLoop )
 
 init();

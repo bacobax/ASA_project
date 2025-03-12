@@ -15,3 +15,30 @@ export function distance({ x: x1, y: y1 }, { x: x2, y: y2 }) {
     const dy = Math.abs(Math.round(y1) - Math.round(y2));
     return dx + dy;
 }
+
+export const baseOptionCollection = (KB) => {
+    const options = [];
+    for (const [id, parcel] of KB.parcels.entries()) {
+        if (parcel.carriedBy) continue;
+        options.push({
+            desire: "go_pick_up",
+            args: [parcel],
+        });
+    }
+    return options;
+};
+
+export const baseOptionSelection = (options) => {
+    let best_option;
+    let nearest_distance = Number.MAX_VALUE;
+    for (const option of options) {
+        if (option.desire != "go_pick_up") continue;
+        const [parcel] = option;
+        const distance_to_option = distance(me, parcel);
+        if (distance_to_option < nearest_distance) {
+            best_option = option;
+            nearest_distance = distance_to_option;
+        }
+    }
+    return best_option;
+};
