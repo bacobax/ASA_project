@@ -2,52 +2,21 @@ import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { distance, process_cmd_args } from "./utils/utils";
 import { default as config } from "../config.js";
 import store from "./store.js";
-
-
-
+import { init_sockets } from "./utils/sockets";
+import { Agent } from "./utils/agent";
 
 function init() {
     /**
-     * Belief revision function 
+     * Belief revision function
      */
     token = config.token;
     processed_token = process_cmd_args(["-token="]);
     if (processed_token.length == 1) {
         token = processed_token[0];
-    }    
-
-    const client = new DeliverooApi(config.url, token);
-
-    
-    function distance( {x:x1, y:y1}, {x:x2, y:y2}) {
-        const dx = Math.abs( Math.round(x1) - Math.round(x2) )
-        const dy = Math.abs( Math.round(y1) - Math.round(y2) )
-        return dx + dy;
     }
 
-    /**
-     * Belief revision function
-     */
-
-    const me = store[0].me;
-
+    const client = new DeliverooApi(config.url, token);
     const myAgent = new Agent();
-
-    client.onYou( ( {id, name, x, y, score} ) => {
-        me.id = id
-        me.name = name
-        me.x = x
-        me.y = y
-        me.score = score
-    } )
-    const parcels = store[0].parcels;
-
-    client.onParcelsSensing(async (perceived_parcels) => {
-        console.log("UPDATO PARCELS");
-        for (const p of perceived_parcels) {
-            parcels.set(p.id, p);
-        }
-    });
 
     client.onParcelsSensing(agentLoop);
 }
