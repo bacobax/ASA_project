@@ -54,11 +54,11 @@ export const baseOptionCollection = (KB) => {
 
 export const baseOptionSelection = (options, KB) => {
     let best_option;
-    
+
     let nearest_distance = Number.MAX_VALUE;
     for (const option of options) {
         if (option.desire != "go_pick_up") continue;
-        const parcel = option;
+        const parcel = option.args[0];
         const distance_to_option = distance(KB.me, parcel);
         if (distance_to_option < nearest_distance) {
             best_option = option;

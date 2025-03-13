@@ -1,6 +1,6 @@
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import config from "../config.js";
-import  Agent  from "./Agent.js";
+import Agent from "./Agent.js";
 
 /**
  *  Class for ClientAgent,
@@ -15,7 +15,6 @@ export default class ClientAgent {
         parcels: new Map(),
     };
     _plans;
-   
 
     constructor({ token, collectOptionsLogic, selectOptionLogic, plans }) {
         this._client = new DeliverooApi(config.host, token);
@@ -57,10 +56,10 @@ export default class ClientAgent {
             console.log("INIZIO AGENT LOOP");
 
             const options = collectOptions(this._knowledgeBase);
-            console.log("OPTIONS: ", options);
+            console.log("OPTIONS: ", JSON.stringify(options));
 
             const bestOPT = selectOption(options, this._knowledgeBase);
-
+            console.log("BEST OPTION: ", JSON.stringify(bestOPT));
             if (bestOPT) {
                 this._agent.queue(bestOPT.desire, this._plans, ...bestOPT.args);
             }
