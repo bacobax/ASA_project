@@ -5,34 +5,28 @@ import Intention from "./Intention.js";
  * which is responsible for managing the intentions of the agent
  */
 export default class Agent {
+    private intention_queue: Intention[] = new Array();
+    private plans: any[];
 
-
-/**
- * bisogna passare lista di possibili plans da passare a cascata alle itnentions
- */
-
-    intention_queue = new Array();
-
-    async intentionLoop() {
+    private async intentionLoop(): Promise<void> {
         while (true) {
             const intention = this.intention_queue.shift();
             if (intention) await intention.achieve();
             await new Promise((res) => setImmediate(res));
         }
     }
-/**
- * queue viene chiamata -> viene creata un'intenzione -> bisogna passare i piani all'intezione
- * @param {*} plans 
- */
-    constructor(plans) {
+
+    constructor(plans: any[]) {
+        this.plans = plans;
         this.intentionLoop();
     }
-    async queue(desire, plans, ...args) {
-        const current = new Intention(desire,plans, ...args);
+
+    async queue(desire: string, plans: any[], ...args: any[]): Promise<void> {
+        const current = new Intention(desire, plans, ...args);
         this.intention_queue.push(current);
     }
 
-    async stop() {
+    async stop(): Promise<void> {
         console.log("stop agent queued intentions");
         for (const intention of this.intention_queue) {
             intention.stop();

@@ -1,6 +1,43 @@
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import config from "../config.js";
-import  Agent  from "./Agent.js";
+import config from "../config";
+import Agent from "./Agent";
+ 
+interface Position {
+    x: number;
+    y: number;
+}
+
+interface Parcel {
+    id: string;
+    x: number;
+    y: number;
+    carriedBy?: string;
+}
+
+export interface KnowledgeBase {
+    me: {
+        id?: string;
+        name?: string;
+        x?: number;
+        y?: number;
+        score?: number;
+    };
+    parcels: Map<string, Parcel>;
+}
+
+interface Option {
+    desire: string;
+    args: any[];
+}
+
+type Plan = (agent: Agent, ...args: any[]) => Promise<boolean>;
+
+export interface ClientAgentConfig {
+    token: string;
+    collectOptionsLogic: (kb: KnowledgeBase) => Option[];
+    selectOptionLogic: (options: Option[], kb: KnowledgeBase) => Option | undefined;
+    plans: Plan[];
+}
 
 /**
  *  Class for ClientAgent,
@@ -8,18 +45,17 @@ import  Agent  from "./Agent.js";
  *  also manages the initialization of the socket
  */
 export default class ClientAgent {
-    _client;
-    _agent;
-    _knowledgeBase = {
+    private _client: DeliverooApi;
+    private _agent: Agent;
+    private _knowledgeBase: KnowledgeBase = {
         me: {},
         parcels: new Map(),
     };
-    _plans;
-   
+    private _plans: Plan[];
 
-    constructor({ token, collectOptionsLogic, selectOptionLogic, plans }) {
+    constructor({ token, collectOptionsLogic, selectOptionLogic, plans }: ClientAgentConfig) {
         this._client = new DeliverooApi(config.host, token);
-        this._agent = new Agent();
+        this._agent = new Agent(plans);
         this._plans = plans;
         this._initSocket({
             collectOptions: collectOptionsLogic,
@@ -27,17 +63,10 @@ export default class ClientAgent {
         });
     }
 
-    /**
-     *
-     * @param {function} collectOptions
-     * @param {function} selectOption
-     * @returns {void}
-     *
-     * initializes the sockets and defines the callbacks for the agent loop
-     * collectOptions: function that collects the options for the agent
-     * selectOption: function that selects the best option for the agent
-     */
-    _initSocket({ collectOptions, selectOption }) {
+    private _initSocket({ collectOptions, selectOption }: {
+        collectOptions: (kb: KnowledgeBase) => Option[];
+        selectOption: (options: Option[], kb: KnowledgeBase) => Option | undefined;
+    }): void {
         this._client.onYou(({ id, name, x, y, score }) => {
             this._knowledgeBase.me.id = id;
             this._knowledgeBase.me.name = name;
@@ -67,19 +96,19 @@ export default class ClientAgent {
         });
     }
 
-    intentionExectuionBusyWaiting() {
+    intentionExectuionBusyWaiting(): void {
         this._agent.intentionLoop();
     }
 
-    get client() {
+    get client(): DeliverooApi {
         return this._client;
     }
 
-    get agent() {
+    get agent(): Agent {
         return this._agent;
     }
 
-    get store() {
+    get store(): KnowledgeBase {
         return this._knowledgeBase;
     }
 }

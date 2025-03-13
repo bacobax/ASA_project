@@ -2,6 +2,7 @@
 
 class Plan {
 
+    
     stop () {
         console.log( 'stop plan and all sub intentions');
         for ( const i of this.#sub_intentions ) {
