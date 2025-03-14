@@ -3,18 +3,22 @@ import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
 import { Planner } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import { Intention } from "./types";
+import { Intention } from "./types/types";
 
 export class AgentBDI {
     private api: DeliverooApi;
-    private beliefs = new BeliefBase();
-    private desires = new DesireGenerator();
-    private intentions = new IntentionManager();
-    private planner = new Planner();
+    private beliefs: BeliefBase = new BeliefBase();
+    private desires:DesireGenerator;
+    private intentions:IntentionManager;
+    private planner:Planner;
     private currentPlan: { action: string; x?: number; y?: number }[] = [];
 
     constructor(api: DeliverooApi) {
         this.api = api;
+        this.desires = new DesireGenerator();
+        this.intentions = new IntentionManager();
+        this.planner = new Planner();
+
         this.setupEventListeners();
     }
 
@@ -24,6 +28,7 @@ export class AgentBDI {
             this.beliefs.updateBelief("visibleParcels", parcels);
             this.intentions.reviseIntentions(this.beliefs);
         });
+        this.api.onMap(data => this.beliefs.updateBelief("map", data));
 
         setInterval(() => this.deliberate(), 1000);
     }

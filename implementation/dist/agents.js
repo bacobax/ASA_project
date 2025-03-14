@@ -17,11 +17,11 @@ const planner_1 = require("./planner");
 class AgentBDI {
     constructor(api) {
         this.beliefs = new beliefs_1.BeliefBase();
+        this.currentPlan = [];
+        this.api = api;
         this.desires = new desire_1.DesireGenerator();
         this.intentions = new intentions_1.IntentionManager();
         this.planner = new planner_1.Planner();
-        this.currentPlan = [];
-        this.api = api;
         this.setupEventListeners();
     }
     setupEventListeners() {
@@ -30,6 +30,7 @@ class AgentBDI {
             this.beliefs.updateBelief("visibleParcels", parcels);
             this.intentions.reviseIntentions(this.beliefs);
         });
+        this.api.onMap(data => this.beliefs.updateBelief("map", data));
         setInterval(() => this.deliberate(), 1000);
     }
     deliberate() {

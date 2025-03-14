@@ -12,6 +12,6 @@
     "allowSyntheticDefaultImports": true,  // Allow `import fs from 'fs'` instead of `import * as fs from 'fs'`,
     "allowJs": true,
   },
-  "include": ["src"],                     // Only compile files inside `src/`
+  "include": ["src",  "src/**/*.ts", "src/types/types.ts", "src/types/deliveroo-js-client.d.ts"],                     // Only compile files inside `src/`
   "exclude": ["node_modules", "dist"]     // Ignore `node_modules` and `dist/`
 }

@@ -1,5 +1,5 @@
 import { BeliefBase } from "./beliefs";
-import { Intention } from "./types";
+import { Intention } from "./types/types";
 import { PlanLibrary } from "./plans";
 
 export class Planner {

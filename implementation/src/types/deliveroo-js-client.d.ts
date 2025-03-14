@@ -40,7 +40,6 @@ interface LogMessage {
 declare module '@unitn-asa/deliveroo-js-client' {
     export class DeliverooApi /*extends EventEmitter*/{
         
-        socket: Socket;
 
         constructor(host: string, token?: string);
 
