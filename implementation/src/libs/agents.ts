@@ -5,6 +5,7 @@ import { Planner } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { Intention } from "../types/types";
 import { MapConfig } from "../types/types";
+import { atomicActions } from "./plans";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -12,7 +13,8 @@ export class AgentBDI {
     private desires:DesireGenerator;
     private intentions:IntentionManager;
     private planner:Planner;
-    private currentPlan: { action: string; x?: number; y?: number }[] = [];
+    private currentPlan: atomicActions[] = [];
+    private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => void>();
 
     constructor(api: DeliverooApi) {
         this.api = api;
@@ -20,6 +22,13 @@ export class AgentBDI {
         this.intentions = new IntentionManager();
         this.planner = new Planner();
 
+        this.atomicActionToApi.set(atomicActions.moveRight,  api => api.move("right"));
+        this.atomicActionToApi.set(atomicActions.moveLeft,  api => api.move("left"));
+        this.atomicActionToApi.set(atomicActions.moveUp,  api => api.move("up"));
+        this.atomicActionToApi.set(atomicActions.moveDown, api => api.move("down"));
+        this.atomicActionToApi.set(atomicActions.pickup, api => api.pickup());
+        this.atomicActionToApi.set(atomicActions.drop, api => api.putdown());
+        
         this.setupEventListeners();
     }
 
@@ -59,14 +68,10 @@ export class AgentBDI {
         console.log("Executing plan", this.currentPlan);
         //TO REIMPLEMENT
         while (this.currentPlan.length > 0) {
-            const step = this.currentPlan.shift();
-            if (step?.action === "move" && step.x !== undefined && step.y !== undefined) {
-                await this.api.move("right");
-            } else if (step?.action === "pickup") {
-                await this.api.pickup();
-            } else if (step?.action === "putdown") {
-                await this.api.putdown();
-            }
+            const step = this.currentPlan.shift() as atomicActions;
+            const correctClientAction = this.atomicActionToApi.get(step);
+            if(!correctClientAction) continue;
+            correctClientAction(this.api);
         }
     }
 }
