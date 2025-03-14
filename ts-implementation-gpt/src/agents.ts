@@ -1,8 +1,8 @@
 import { BeliefBase } from "./beliefs";
-import { DesireGenerator } from "./desires";
+import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
 import { Planner } from "./planner";
-import { DeliverooApi } from "./deliverooApi";
+import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { Intention } from "./types";
 
 export class AgentBDI {
@@ -19,8 +19,8 @@ export class AgentBDI {
     }
 
     private setupEventListeners() {
-        this.api.on("you", data => this.beliefs.updateBelief("position", { x: data.x, y: data.y }));
-        this.api.on("parcelsSensing", parcels => {
+        this.api.onYou(data => this.beliefs.updateBelief("position", { x: data.x, y: data.y }));
+        this.api.onParcelsSensing(parcels => {
             this.beliefs.updateBelief("visibleParcels", parcels);
             this.intentions.reviseIntentions(this.beliefs);
         });

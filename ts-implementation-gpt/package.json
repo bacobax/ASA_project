@@ -13,5 +13,9 @@
     "@unitn-asa/pddl-client": "^0.0.37",
     "node-fetch": "^3.3.0",
     "socket.io-client": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "dotenv": "^16.0.3"
   }
 }

@@ -1,5 +1,5 @@
 import { BeliefBase } from "./beliefs";
-import { Intention } from "./types";
+import { Intention, Parcel } from "./types";
 
 export class DesireGenerator {
     generateDesires(beliefs: BeliefBase): Intention[] {

@@ -9,7 +9,8 @@
     "resolveJsonModule": true,            // Allow importing JSON files
     "skipLibCheck": true,                 // Skip type checking of declaration files
     "moduleResolution": "node",           // Resolve modules in a Node.js environment
-    "allowSyntheticDefaultImports": true  // Allow `import fs from 'fs'` instead of `import * as fs from 'fs'`
+    "allowSyntheticDefaultImports": true,  // Allow `import fs from 'fs'` instead of `import * as fs from 'fs'`,
+    "allowJs": true,
   },
   "include": ["src"],                     // Only compile files inside `src/`
   "exclude": ["node_modules", "dist"]     // Ignore `node_modules` and `dist/`
