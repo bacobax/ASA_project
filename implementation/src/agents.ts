@@ -4,6 +4,7 @@ import { IntentionManager } from "./intentions";
 import { Planner } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { Intention } from "./types/types";
+import { MapConfig } from "./types/types";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -28,7 +29,14 @@ export class AgentBDI {
             this.beliefs.updateBelief("visibleParcels", parcels);
             this.intentions.reviseIntentions(this.beliefs);
         });
-        this.api.onMap(data => this.beliefs.updateBelief("map", data));
+        this.api.onMap((width, height, data) => {
+            const map: MapConfig = {
+                width: width,
+                height: height,
+                tiles: data
+            }
+            this.beliefs.updateBelief("map", map);
+        });
 
         setInterval(() => this.deliberate(), 1000);
     }
@@ -48,6 +56,8 @@ export class AgentBDI {
     }
 
     private async executePlan() {
+        console.log("Executing plan", this.currentPlan);
+        //TO REIMPLEMENT
         while (this.currentPlan.length > 0) {
             const step = this.currentPlan.shift();
             if (step?.action === "move" && step.x !== undefined && step.y !== undefined) {

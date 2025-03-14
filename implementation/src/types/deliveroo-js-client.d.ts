@@ -1,43 +1,7 @@
-// import { Socket } from "socket.io-client";
-// import { EventEmitter } from "events";
 
-interface MapTile {
-    x: number;
-    y: number;
-    delivery: boolean;
-}
-
-interface MapConfig {
-    width: number;
-    height: number;
-    tiles: MapTile[];
-}
-
-interface Agent {
-    id: string;
-    name: string;
-    x: number;
-    y: number;
-    score: number;
-}
-
-interface Parcel {
-    id: string;
-    x: number;
-    y: number;
-    carriedBy: string | null;
-    reward: number;
-}
-
-interface LogMessage {
-    src: "server" | "client";
-    timestamp: number;
-    socket: string;
-    id: string;
-    name: string;
-}
 
 declare module '@unitn-asa/deliveroo-js-client' {
+    import {Intention, MapTile, MapConfig, Agent, Parcel} from './types';
     export class DeliverooApi /*extends EventEmitter*/{
         
 

@@ -2,7 +2,7 @@ export class BeliefBase {
     private beliefs: Map<string, any> = new Map();
 
     updateBelief<T>(key: string, value: T): void {
-        console.log("Updating belief", key, value);
+        //console.log("Updating belief", key, value);
         this.beliefs.set(key, value);
     }
 
