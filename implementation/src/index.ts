@@ -1,4 +1,4 @@
-import { AgentBDI } from "./agents";
+import { AgentBDI } from "./libs/agents";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import config from "./config";
 

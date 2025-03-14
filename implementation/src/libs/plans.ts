@@ -1,4 +1,4 @@
-import { Intention } from "./types/types";
+import { Intention } from "../types/types";
 
 export class PlanLibrary {
     static getPlan(intention: Intention): { action: string; x?: number; y?: number }[] {
