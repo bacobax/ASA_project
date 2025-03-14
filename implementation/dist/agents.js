@@ -25,8 +25,8 @@ class AgentBDI {
         this.setupEventListeners();
     }
     setupEventListeners() {
-        this.api.on("you", data => this.beliefs.updateBelief("position", { x: data.x, y: data.y }));
-        this.api.on("parcelsSensing", parcels => {
+        this.api.onYou(data => this.beliefs.updateBelief("position", { x: data.x, y: data.y }));
+        this.api.onParcelsSensing(parcels => {
             this.beliefs.updateBelief("visibleParcels", parcels);
             this.intentions.reviseIntentions(this.beliefs);
         });
