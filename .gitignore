@@ -26,3 +26,8 @@ bin
 
 .yalc
 .qodo
+
+implementation/dist
+/implementation/dist
+implementation/dist/*
+/implementation/dist/*
