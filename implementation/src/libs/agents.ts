@@ -3,8 +3,8 @@ import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
 import { Planner } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import { Intention } from "./types/types";
-import { MapConfig } from "./types/types";
+import { Intention } from "../types/types";
+import { MapConfig } from "../types/types";
 
 export class AgentBDI {
     private api: DeliverooApi;
