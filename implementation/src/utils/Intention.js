@@ -14,8 +14,12 @@ export default class Intention extends Promise {
     #resolve;
     #reject;
     #plans;
+    #agent;
 
-    constructor(desire, plans, ...args) {
+    constructor(desire, plans, agent, ...args) {
+        console.log(
+            "__________________________Intention Constructor__________________________"
+        );
         var resolve, reject;
         super(async (res, rej) => {
             resolve = res;
@@ -26,6 +30,10 @@ export default class Intention extends Promise {
         this.#desire = desire;
         this.#args = args;
         this.#plans = plans;
+        this.#agent = agent;
+
+        console.log("plans of intention ", this.#desire, ": ", plans);
+        console.log("agent.knowledgeBase", JSON.stringify(agent.knowledgeBase));
     }
 
     #started = false;
@@ -36,9 +44,18 @@ export default class Intention extends Promise {
         /**
          * Plan selection
          */
-        let best_plan;
-        let best_plan_score = Number.MIN_VALUE;
-        for (const plan of this.plans) {
+        // let best_plan;
+        // let best_plan_score = Number.MIN_VALUE;
+        console.log(
+            "__________________________ACHIEVE INTETION__________________________\n",
+            "desire:",
+            JSON.stringify(this.#desire),
+            "\nplans",
+            this.#plans
+        );
+        for (const plan of this.#plans) {
+            console.log("____CHECK PLAN____", plan);
+            console.log("____DESIRED____", this.#desire);
             if (plan.isApplicableTo(this.#desire)) {
                 this.#current_plan = plan;
                 console.log(
@@ -49,7 +66,10 @@ export default class Intention extends Promise {
                     plan
                 );
                 try {
-                    const result = await plan.execute(...this.#args);
+                    const result = await plan.execute(
+                        ...this.#args,
+                        this.#agent
+                    );
                     this.#resolve(result);
                     console.log(
                         "plan",
@@ -58,6 +78,7 @@ export default class Intention extends Promise {
                         this.#desire,
                         ...this.#args
                     );
+                    return;
                 } catch (error) {
                     console.log(
                         "plan",
@@ -66,9 +87,13 @@ export default class Intention extends Promise {
                         this.#desire,
                         ...this.#args
                     );
-                    this.#reject(e);
+                    this.#reject(error);
+                    return;
                 }
             }
         }
+
+        this.#reject("no plan found for desire " + this.#desire);
+        return;
     }
 }
