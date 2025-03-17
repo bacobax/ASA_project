@@ -10,7 +10,8 @@ export interface Intention {
 }
 
 export interface MapTile {
-    position: Position;
+    x: number;
+    y: number;
     delivery: boolean;
 }
 

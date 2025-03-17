@@ -38,11 +38,12 @@ export class AgentBDI {
             this.intentions.reviseIntentions(this.beliefs);
         });
         this.api.onMap((width, height, data) => {
-            const map: MapConfig = {
+            let map: MapConfig = {
                 width: width,
                 height: height,
                 tiles: data
             }
+            
             this.beliefs.updateBelief("map", map);
             const {dist, prev, paths} = floydWarshallWithPaths(map);
             this.beliefs.updateBelief("dist", dist);

@@ -6,7 +6,7 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
 
     // Create a map of valid tiles for quick lookup
     const validTiles = new Map<string, MapTile>();
-    tiles.forEach(tile => validTiles.set(`${tile.position.x},${tile.position.y}`, tile));
+    tiles.forEach(tile => validTiles.set(`${tile.x},${tile.y}`, tile));
 
     // Distance and predecessor matrices
     const dist: number[][]= Array.from({ length: numTiles }, () => Array(numTiles).fill(Infinity));
@@ -86,13 +86,13 @@ export function getOptimalPath(startPos:Position, endPos:Position,mapWidth:numbe
         const nextTile = path[i + 1];
 
         // Determine the direction from currentTile to nextTile and map to an atomic action
-        if (nextTile.position.x > currentTile.position.x) {
+        if (nextTile.x > currentTile.x) {
             actions.push(atomicActions.moveRight);
-        } else if (nextTile.position.x < currentTile.position.x) {
+        } else if (nextTile.x < currentTile.x) {
             actions.push(atomicActions.moveLeft);
-        } else if (nextTile.position.y > currentTile.position.y) {
+        } else if (nextTile.y > currentTile.y) {
             actions.push(atomicActions.moveDown);
-        } else if (nextTile.position.y < currentTile.position.y) {
+        } else if (nextTile.y < currentTile.y) {
             actions.push(atomicActions.moveUp);
         }
     }

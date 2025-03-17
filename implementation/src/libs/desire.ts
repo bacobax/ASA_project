@@ -28,7 +28,7 @@ export class DesireGenerator {
             let minDistance:number = Infinity;
             for (let i = 0; i < deliveries.length; i++) {
                 
-                const dist = distances[getTileIndex(curPos, map.width)][getTileIndex(deliveries[i].position, map.width)];
+                const dist = distances[getTileIndex(curPos, map.width)][getTileIndex({x:deliveries[i].x, y:deliveries[i].y}, map.width)];
                 if(dist > 3 && dist < minDistance){
                     minDistance = dist;
                 }
