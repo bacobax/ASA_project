@@ -1,40 +1,52 @@
-import { Intention } from "../types/types";
+import { Intention, atomicActions, Position, MapConfig, MapTile } from "../types/types";
+import { BeliefBase } from "./beliefs";
+import { getOptimalPath } from "./utils";
 
 
-export enum atomicActions {
-    moveRight = "moveRight",
-    moveLeft = "moveLeft",
-    moveUp = "moveUp",
-    moveDown = "moveDown",
-    pickup = "pickup",
-    drop = "drop",
-}
 
-const moveDirection = (intention: Intention):atomicActions =>{
+// const moveDirection = (intention: Intention):atomicActions =>{
 
-    if(intention.x !== undefined && intention.x > 0){
-        return atomicActions.moveRight;
-    }
-    if(intention.x !== undefined && intention.x < 0){
-        return atomicActions.moveLeft;
-    }
-    if(intention.y !== undefined && intention.y > 0){
-        return atomicActions.moveUp;
-    }
-    if(intention.y !== undefined && intention.y < 0){
-        return atomicActions.moveDown;
-    }
-    return atomicActions.moveRight;
-}
-
+//     if(intention.position.x !== undefined && intention.position.x > 0){
+//         return atomicActions.moveRight;
+//     }
+//     if(intention.position.x !== undefined && intention.position.x < 0){
+//         return atomicActions.moveLeft;
+//     }
+//     if(intention.position.y !== undefined && intention.position.y > 0){
+//         return atomicActions.moveUp;
+//     }
+//     if(intention.position.y !== undefined && intention.position.y < 0){
+//         return atomicActions.moveDown;
+//     }
+//     return atomicActions.moveRight;
+// }
 
 export class PlanLibrary {
-    static getPlan(intention: Intention): atomicActions[] {
+    static getPlan(intention: Intention, beliefs:BeliefBase): atomicActions[] {
+        const curPos:Position = beliefs.getBelief("position") as Position;
+        var actions:atomicActions[] = []
         switch (intention.type) {
             case "pickup":
-                return [moveDirection(intention), atomicActions.pickup];
+                if(intention.position && intention.position.x!= curPos.x && intention.position.y!=curPos.y){
+                    const map:MapConfig = beliefs.getBelief("map") as MapConfig;
+                    actions = getOptimalPath(curPos, intention.position, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
+                }
+                actions.push(atomicActions.pickup)
+                return actions;
             case "deliver":
-                return [moveDirection(intention), atomicActions.drop];
+                if(intention.position && intention.position.x!= curPos.x && intention.position.y!=curPos.y){
+                    const map:MapConfig = beliefs.getBelief("map") as MapConfig;
+                    actions = getOptimalPath(curPos, intention.position, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
+                }
+                actions.push(atomicActions.drop)
+                
+                return actions;
+            case "move":
+                if(intention.position && intention.position.x!= curPos.x && intention.position.y!=curPos.y){
+                    const map:MapConfig = beliefs.getBelief("map") as MapConfig;
+                    actions = getOptimalPath(curPos, intention.position, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
+                }
+                return actions;
             default:
                 return [];
         }

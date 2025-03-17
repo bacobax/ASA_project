@@ -3,9 +3,8 @@ import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
 import { Planner } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import { Intention } from "../types/types";
-import { MapConfig } from "../types/types";
-import { atomicActions } from "./plans";
+import { floydWarshallWithPaths } from "./utils";
+import { MapConfig, Position, atomicActions } from "../types/types";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -14,7 +13,7 @@ export class AgentBDI {
     private intentions:IntentionManager;
     private planner:Planner;
     private currentPlan: atomicActions[] = [];
-    private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => void>();
+    private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
 
     constructor(api: DeliverooApi) {
         this.api = api;
@@ -45,9 +44,16 @@ export class AgentBDI {
                 tiles: data
             }
             this.beliefs.updateBelief("map", map);
+            const {dist, prev, paths} = floydWarshallWithPaths(map);
+            this.beliefs.updateBelief("dist", dist);
+            this.beliefs.updateBelief("prev", prev);
+            this.beliefs.updateBelief("paths", paths);
+            this.beliefs.updateBelief("deliveries", map.tiles.filter(tile => tile.delivery === true))
+
+            setInterval(() => this.deliberate(), 1000);
         });
 
-        setInterval(() => this.deliberate(), 1000);
+        
     }
 
     private deliberate() {

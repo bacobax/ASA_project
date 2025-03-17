@@ -4,15 +4,13 @@ export interface Position {
 }
 
 export interface Intention {
-    type: "pickup" | "deliver";
+    type: "pickup" | "deliver" | "move";
     parcelId?: string;
-    x?: number;
-    y?: number;
+    position?: Position;
 }
 
 export interface MapTile {
-    x: number;
-    y: number;
+    position: Position;
     delivery: boolean;
 }
 
@@ -25,15 +23,13 @@ export interface MapConfig {
 export interface Agent {
     id: string;
     name: string;
-    x: number;
-    y: number;
+    position: Position;
     score: number;
 }
 
 export interface Parcel {
     id: string;
-    x: number;
-    y: number;
+    position: Position;
     carriedBy: string | null;
     reward: number;
 }
@@ -44,4 +40,13 @@ export interface LogMessage {
     socket: string;
     id: string;
     name: string;
+}
+
+export enum atomicActions {
+    moveRight = "moveRight",
+    moveLeft = "moveLeft",
+    moveUp = "moveUp",
+    moveDown = "moveDown",
+    pickup = "pickup",
+    drop = "drop",
 }
