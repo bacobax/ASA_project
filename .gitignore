@@ -1,6 +1,6 @@
 # Dependency directories
 **/node_modules/
-**/dist/
+**/src/dist/*
 
 # IDE
 .vscode
@@ -28,7 +28,3 @@ bin
 .yalc
 .qodo
 
-implementation/dist
-/implementation/dist
-implementation/dist/*
-/implementation/dist/*

@@ -32,7 +32,11 @@ export class AgentBDI {
     }
 
     private setupEventListeners() {
-        this.api.onYou(data => this.beliefs.updateBelief("position", { x: data.x, y: data.y }));
+        this.api.onYou(data =>{
+            this.beliefs.updateBelief("position", { x: data.x, y: data.y });
+            this.beliefs.updateBelief("id", data.id);
+            this.beliefs.updateBelief("score", data.score);
+            });
         this.api.onParcelsSensing(parcels => {
             this.beliefs.updateBelief("visibleParcels", parcels);
             this.intentions.reviseIntentions(this.beliefs);
@@ -73,15 +77,23 @@ export class AgentBDI {
 
     private async executePlan() {
         console.log("Executing plan", this.currentPlan);
-        //TO REIMPLEMENT
         while (this.currentPlan.length > 0) {
+            /* TO IMPLEMENT
+            if(plan is not valid anymore, because the intention is not good anymore){
+                stop current plan
+            }
+            */
             const step = this.currentPlan.shift() as atomicActions;
             const correctClientAction = this.atomicActionToApi.get(step);
             if(!correctClientAction) continue;
             const res = await correctClientAction(this.api);
             if(!res){
                 console.log("Failed ", step);
+                //STOP PLAN
             }else{
+                // if(step == atomicActions.pickup){
+                //     this.beliefs.updateBelief("carryingParcels",)
+                // }
                 console.log("Success ", step, "\ndata: ", res)
             }
         }

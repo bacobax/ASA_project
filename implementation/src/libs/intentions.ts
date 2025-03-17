@@ -15,7 +15,8 @@ export class IntentionManager {
     reviseIntentions(beliefs: BeliefBase): void {
         this.intentions = this.intentions.filter(intention => {
             if (intention.type === "pickup") {
-                return beliefs.getBelief<Parcel[]>("visibleParcels")?.some(p => p.id === intention.parcelId);
+                const visibleParcels = beliefs.getBelief<Parcel[]>("visibleParcels")?.filter(p => p.carriedBy == null);
+                return visibleParcels?.some(p => p.id === intention.parcelId);
             }
             if (intention.type === "deliver") {
                 return beliefs.hasBelief("carryingParcels") && beliefs.getBelief<string[]>("carryingParcels")!.length > 0;

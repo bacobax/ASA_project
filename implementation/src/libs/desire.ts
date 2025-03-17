@@ -1,6 +1,6 @@
 import { BeliefBase } from "./beliefs";
 import { Intention, Parcel, MapTile, Position, MapConfig } from "../types/types";
-import { getTileIndex } from "./utils";
+import { getTileIndex, getDeliverySpot } from "./utils";
 
 export class DesireGenerator {
     generateDesires(beliefs: BeliefBase): Intention[] {
@@ -14,25 +14,15 @@ export class DesireGenerator {
             }
         }
 
-        const carryingParcels = beliefs.getBelief<string[]>("carryingParcels");
+        const carryingParcels = parcels?.filter(parcel => parcel.carriedBy == beliefs.getBelief("id"));
         if (carryingParcels && carryingParcels.length > 0) {
             console.log("Desire pushed - deliver");
             desires.push({ type: "deliver" });
         }
 
         if(desires.length==0){
-            const deliveries:MapTile[] = beliefs.getBelief("deliveries") as MapTile[];
-            const curPos: Position = beliefs.getBelief("position") as Position;
-            const distances: number[][] = beliefs.getBelief("dist") as number[][];
-            const map: MapConfig = beliefs.getBelief("map") as MapConfig;
-            let minDistance:number = Infinity;
-            for (let i = 0; i < deliveries.length; i++) {
-                
-                const dist = distances[getTileIndex(curPos, map.width)][getTileIndex({x:deliveries[i].x, y:deliveries[i].y}, map.width)];
-                if(dist > 3 && dist < minDistance){
-                    minDistance = dist;
-                }
-            }
+            console.log("Desire pushed - move");
+            desires.push({type: "move"})
         }
 
         return desires;
