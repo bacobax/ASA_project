@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.floydWarshallWithPaths = floydWarshallWithPaths;
 exports.getOptimalPath = getOptimalPath;
 exports.getTileIndex = getTileIndex;
+exports.getTilePosition = getTilePosition;
 exports.getDeliverySpot = getDeliverySpot;
 const types_1 = require("../types/types");
 function floydWarshallWithPaths(mapConfig) {
@@ -65,8 +66,13 @@ function floydWarshallWithPaths(mapConfig) {
 }
 function getOptimalPath(startPos, endPos, mapWidth, mapHeight, paths) {
     var _a;
+    if (startPos.x == endPos.x && startPos.y == endPos.y) {
+        return [];
+    }
     const startTileIndex = getTileIndex(startPos, mapWidth);
     const endTileIndex = getTileIndex(endPos, mapWidth);
+    console.log('start index:', startTileIndex, ' Pos:', getTilePosition(startTileIndex, mapWidth));
+    console.log('end index:', endTileIndex, ' Pos:', getTilePosition(startTileIndex, mapWidth));
     const path = (_a = paths.get(startTileIndex)) === null || _a === void 0 ? void 0 : _a.get(endTileIndex);
     if (!path) {
         throw new Error("No path found from start to end.");
@@ -95,6 +101,9 @@ function getOptimalPath(startPos, endPos, mapWidth, mapHeight, paths) {
 function getTileIndex(pos, mapWidth) {
     return pos.y * mapWidth + pos.x;
 }
+function getTilePosition(index, mapWidth) {
+    return { y: Math.floor(index / mapWidth), x: index % mapWidth };
+}
 function getDeliverySpot(startPos, minMovement, beliefs) {
     const deliveries = beliefs.getBelief("deliveries");
     const distances = beliefs.getBelief("dist");
@@ -103,6 +112,9 @@ function getDeliverySpot(startPos, minMovement, beliefs) {
     let minDistancePos;
     for (let i = 0; i < deliveries.length; i++) {
         const pos = { x: deliveries[i].x, y: deliveries[i].y };
+        console.log("----getDeliverySpot i:", i, " -----");
+        console.log("startPos:", startPos);
+        console.log("endPos:", pos);
         const dist = distances[getTileIndex(startPos, map.width)][getTileIndex(pos, map.width)];
         if (dist >= minMovement && dist < minDistance) {
             minDistance = dist;

@@ -21,6 +21,8 @@ class AgentBDI {
         this.beliefs = new beliefs_1.BeliefBase();
         this.currentPlan = [];
         this.atomicActionToApi = new Map();
+        this.isPlanRunning = false; // Flag to track if a plan is running
+        this.planAbortSignal = false; // Abort signal to stop the current plan
         this.api = api;
         this.desires = new desire_1.DesireGenerator();
         this.intentions = new intentions_1.IntentionManager();
@@ -35,7 +37,7 @@ class AgentBDI {
     }
     setupEventListeners() {
         this.api.onYou(data => {
-            this.beliefs.updateBelief("position", { x: data.x, y: data.y });
+            this.beliefs.updateBelief("position", { x: Math.round(data.x), y: Math.round(data.y) });
             this.beliefs.updateBelief("id", data.id);
             this.beliefs.updateBelief("score", data.score);
         });
@@ -51,6 +53,16 @@ class AgentBDI {
             };
             this.beliefs.updateBelief("map", map);
             const { dist, prev, paths } = (0, utils_1.floydWarshallWithPaths)(map);
+            // for(let i = 0; i<100; i++){
+            //     for(let j = 0; j<100; j++){
+            //         if(i!=j){
+            //             if(dist[i][j]!=Infinity){
+            //                 console.log("--------from ", getTilePosition(i, 10), " to ", getTilePosition(j, 10),":");
+            //                 console.log(dist[i][j]);
+            //             }
+            //         }
+            //     }
+            // }
             this.beliefs.updateBelief("dist", dist);
             this.beliefs.updateBelief("prev", prev);
             this.beliefs.updateBelief("paths", paths);
@@ -60,7 +72,11 @@ class AgentBDI {
     }
     deliberate() {
         this.intentions.reviseIntentions(this.beliefs);
-        if (!this.intentions.hasIntentions()) {
+        if (!this.intentions.hasIntentions() || this.planAbortSignal) {
+            if (this.isPlanRunning) {
+                console.log("Plan has been interrupted due to a new intention or invalid state.");
+                this.stopCurrentPlan(); // Stop the current plan if needed
+            }
             const newDesires = this.desires.generateDesires(this.beliefs);
             if (newDesires.length > 0) {
                 const newIntention = newDesires[0];
@@ -72,9 +88,14 @@ class AgentBDI {
     }
     executePlan() {
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.isPlanRunning) {
+                console.log("Plan already running, aborting new execution.");
+                return; // Prevent starting a new plan if one is already running
+            }
             console.log("Executing plan", this.currentPlan);
-            //TO REIMPLEMENT
-            while (this.currentPlan.length > 0) {
+            this.isPlanRunning = true; // Mark the plan as running
+            this.planAbortSignal = false; // Reset abort signal
+            while (this.currentPlan.length > 0 && !this.planAbortSignal) {
                 const step = this.currentPlan.shift();
                 const correctClientAction = this.atomicActionToApi.get(step);
                 if (!correctClientAction)
@@ -82,15 +103,24 @@ class AgentBDI {
                 const res = yield correctClientAction(this.api);
                 if (!res) {
                     console.log("Failed ", step);
+                    this.stopCurrentPlan(); // Stop the plan if it fails
+                    break;
                 }
                 else {
-                    // if(step == atomicActions.pickup){
-                    //     this.beliefs.updateBelief("carryingParcels",)
-                    // }
-                    console.log("Success ", step, "\ndata: ", res);
+                    //console.log("Success ", step, "\ndata: ", res);
                 }
             }
+            if (!this.planAbortSignal) {
+                console.log("Plan completed successfully.");
+            }
+            this.isPlanRunning = false; // Mark the plan as completed
         });
+    }
+    stopCurrentPlan() {
+        console.log("Stopping current plan.");
+        this.planAbortSignal = true; // Set the abort signal to stop execution
+        this.isPlanRunning = false; // Reset the running state
+        this.currentPlan = []; // Optionally, clear the current plan
     }
 }
 exports.AgentBDI = AgentBDI;

@@ -21,6 +21,15 @@ export class IntentionManager {
             if (intention.type === "deliver") {
                 return beliefs.hasBelief("carryingParcels") && beliefs.getBelief<string[]>("carryingParcels")!.length > 0;
             }
+            if (intention.type === "move") {
+                const visibleParcels = beliefs.getBelief<Parcel[]>("visibleParcels")?.filter(p => p.carriedBy == null);
+                if(visibleParcels?.length !== undefined && visibleParcels?.length>0){
+                    return false;
+                }
+                if(beliefs.getBelief("position") == intention.position){
+                    return false;
+                }
+            }
             return true;
         });
     }

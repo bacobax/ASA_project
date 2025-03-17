@@ -71,8 +71,26 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
 }
 
 export function getOptimalPath(startPos:Position, endPos:Position,mapWidth:number, mapHeight:number, paths:Map<number, Map<number, MapTile[]>>):atomicActions[]{
+    if(startPos.x==endPos.x && startPos.y == endPos.y){
+        return [];
+    }
+
     const startTileIndex = getTileIndex(startPos, mapWidth);
     const endTileIndex = getTileIndex(endPos, mapWidth);
+
+    console.log(
+        'start index:',
+        startTileIndex,
+        ' Pos:',
+        getTilePosition(startTileIndex, mapWidth)
+      );
+
+      console.log(
+        'end index:',
+        endTileIndex,
+        ' Pos:',
+        getTilePosition(startTileIndex, mapWidth)
+      );
 
     const path = paths.get(startTileIndex)?.get(endTileIndex);
     if (!path) {
@@ -106,6 +124,10 @@ export function getTileIndex(pos:Position, mapWidth:number):number{
     return pos.y * mapWidth + pos.x;
 }
 
+export function getTilePosition(index:number, mapWidth:number):Position{
+    return {y:Math.floor(index/mapWidth), x:index%mapWidth};
+}
+
 export function getDeliverySpot(startPos:Position, minMovement:number, beliefs:BeliefBase):Position{
     const deliveries:MapTile[] = beliefs.getBelief("deliveries") as MapTile[];
     const distances: number[][] = beliefs.getBelief("dist") as number[][];
@@ -114,6 +136,9 @@ export function getDeliverySpot(startPos:Position, minMovement:number, beliefs:B
     let minDistancePos;
     for (let i = 0; i < deliveries.length; i++) {
         const pos:Position = {x:deliveries[i].x, y:deliveries[i].y};
+        console.log("----getDeliverySpot i:",i," -----");
+        console.log("startPos:", startPos);
+        console.log("endPos:", pos);
         const dist = distances[getTileIndex(startPos, map.width)][getTileIndex(pos, map.width)];
         if(dist >= minMovement && dist < minDistance){
             minDistance = dist;

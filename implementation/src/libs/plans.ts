@@ -23,9 +23,9 @@ export class PlanLibrary {
                 
                 return actions;
             case "move":
-                const deliveryPosDis:Position = getDeliverySpot(curPos, 3, beliefs);
-                actions = getOptimalPath(curPos, deliveryPosDis, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
-                
+                if(intention.position !== undefined && (intention.position.x!= curPos.x || intention.position.y!=curPos.y)){
+                    actions = getOptimalPath(curPos, intention.position, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
+                }
                 return actions;
             default:
                 return [];
