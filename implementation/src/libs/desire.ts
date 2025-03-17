@@ -10,7 +10,7 @@ export class DesireGenerator {
         if (parcels) {
             for (let parcel of parcels) {
                 console.log("Desire pushed - pickup:", parcel);
-                desires.push({ type: "pickup", parcelId: parcel.id, position: parcel.position});
+                desires.push({ type: "pickup", parcelId: parcel.id, position: {x:parcel.x, y:parcel.y}});
             }
         }
 

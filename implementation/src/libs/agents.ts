@@ -43,7 +43,7 @@ export class AgentBDI {
                 height: height,
                 tiles: data
             }
-            
+
             this.beliefs.updateBelief("map", map);
             const {dist, prev, paths} = floydWarshallWithPaths(map);
             this.beliefs.updateBelief("dist", dist);
@@ -78,7 +78,12 @@ export class AgentBDI {
             const step = this.currentPlan.shift() as atomicActions;
             const correctClientAction = this.atomicActionToApi.get(step);
             if(!correctClientAction) continue;
-            correctClientAction(this.api);
+            const res = await correctClientAction(this.api);
+            if(!res){
+                console.log("Failed ", step);
+            }else{
+                console.log("Success ", step, "\ndata: ", res)
+            }
         }
     }
 }

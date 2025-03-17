@@ -91,9 +91,10 @@ export function getOptimalPath(startPos:Position, endPos:Position,mapWidth:numbe
         } else if (nextTile.x < currentTile.x) {
             actions.push(atomicActions.moveLeft);
         } else if (nextTile.y > currentTile.y) {
-            actions.push(atomicActions.moveDown);
-        } else if (nextTile.y < currentTile.y) {
             actions.push(atomicActions.moveUp);
+        } else if (nextTile.y < currentTile.y) {
+            actions.push(atomicActions.moveDown);
+            
         }
     }
 

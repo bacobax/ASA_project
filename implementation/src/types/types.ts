@@ -30,7 +30,8 @@ export interface Agent {
 
 export interface Parcel {
     id: string;
-    position: Position;
+    x: number;
+    y: number;
     carriedBy: string | null;
     reward: number;
 }

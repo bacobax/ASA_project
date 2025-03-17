@@ -25,16 +25,20 @@ export class PlanLibrary {
     static getPlan(intention: Intention, beliefs:BeliefBase): atomicActions[] {
         const curPos:Position = beliefs.getBelief("position") as Position;
         var actions:atomicActions[] = []
+        console.log("intention:", intention);
+        console.log("curPos:", curPos);
         switch (intention.type) {
             case "pickup":
-                if(intention.position && intention.position.x!= curPos.x && intention.position.y!=curPos.y){
+                if(intention.position !== undefined && (intention.position.x!= curPos.x || intention.position.y!=curPos.y)){
+                    console.log("intention:", intention);
+                    console.log("curPos:", curPos);
                     const map:MapConfig = beliefs.getBelief("map") as MapConfig;
                     actions = getOptimalPath(curPos, intention.position, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
                 }
                 actions.push(atomicActions.pickup)
                 return actions;
             case "deliver":
-                if(intention.position && intention.position.x!= curPos.x && intention.position.y!=curPos.y){
+                if(intention.position !== undefined && (intention.position.x!= curPos.x || intention.position.y!=curPos.y)){
                     const map:MapConfig = beliefs.getBelief("map") as MapConfig;
                     actions = getOptimalPath(curPos, intention.position, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
                 }
@@ -42,7 +46,7 @@ export class PlanLibrary {
                 
                 return actions;
             case "move":
-                if(intention.position && intention.position.x!= curPos.x && intention.position.y!=curPos.y){
+                if(intention.position !== undefined && (intention.position.x!= curPos.x || intention.position.y!=curPos.y)){
                     const map:MapConfig = beliefs.getBelief("map") as MapConfig;
                     actions = getOptimalPath(curPos, intention.position, map.width, map.height, beliefs.getBelief("paths") as Map<number, Map<number, MapTile[]>>)
                 }
