@@ -1,22 +1,30 @@
 import { BeliefBase } from "./beliefs";
-import { Intention, Parcel } from "../types/types";
+import { Intention, Parcel, MapTile, Position, MapConfig } from "../types/types";
+import { getTileIndex, getDeliverySpot } from "./utils";
 
 export class DesireGenerator {
     generateDesires(beliefs: BeliefBase): Intention[] {
+        console.log("-----Generating Desires-----");
         let desires: Intention[] = [];
 
         const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
-        if (parcels) {
-            for (let parcel of parcels) {
-                console.log("Desire pushed - pickup:", parcel);
-                desires.push({ type: "pickup", parcelId: parcel.id, x: parcel.x, y: parcel.y });
-            }
-        }
+        const carryingParcels = parcels?.filter(parcel => parcel.carriedBy == beliefs.getBelief("id"));
 
-        const carryingParcels = beliefs.getBelief<string[]>("carryingParcels");
         if (carryingParcels && carryingParcels.length > 0) {
             console.log("Desire pushed - deliver");
             desires.push({ type: "deliver" });
+        }
+
+        if (parcels) {
+            for (let parcel of parcels) {
+                console.log("Desire pushed - pickup:", parcel);
+                desires.push({ type: "pickup", parcelId: parcel.id, position: {x:parcel.x, y:parcel.y}});
+            }
+        }
+
+        if(desires.length==0){
+            console.log("Desire pushed - move");
+            desires.push({type: "move", position: getDeliverySpot(beliefs.getBelief("position") as Position,3,beliefs)});
         }
 
         return desires;

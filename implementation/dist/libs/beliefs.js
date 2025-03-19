@@ -6,7 +6,7 @@ class BeliefBase {
         this.beliefs = new Map();
     }
     updateBelief(key, value) {
-        console.log("Updating belief", key, value);
+        //console.log("Updating belief", key, value);
         this.beliefs.set(key, value);
     }
     getBelief(key) {

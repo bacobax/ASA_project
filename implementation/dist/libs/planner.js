@@ -4,7 +4,7 @@ exports.Planner = void 0;
 const plans_1 = require("./plans");
 class Planner {
     planFor(intention, beliefs) {
-        return plans_1.PlanLibrary.getPlan(intention);
+        return plans_1.PlanLibrary.getPlan(intention, beliefs);
     }
 }
 exports.Planner = Planner;

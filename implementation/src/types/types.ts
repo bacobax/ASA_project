@@ -4,10 +4,9 @@ export interface Position {
 }
 
 export interface Intention {
-    type: "pickup" | "deliver";
+    type: "pickup" | "deliver" | "move";
     parcelId?: string;
-    x?: number;
-    y?: number;
+    position?: Position;
 }
 
 export interface MapTile {
@@ -30,6 +29,12 @@ export interface Agent {
     score: number;
 }
 
+export interface AgentLog{
+    prevPosition :Position;
+    timestamp: number;
+}
+
+
 export interface Parcel {
     id: string;
     x: number;
@@ -44,4 +49,13 @@ export interface LogMessage {
     socket: string;
     id: string;
     name: string;
+}
+
+export enum atomicActions {
+    moveRight = "moveRight",
+    moveLeft = "moveLeft",
+    moveUp = "moveUp",
+    moveDown = "moveDown",
+    pickup = "pickup",
+    drop = "drop",
 }

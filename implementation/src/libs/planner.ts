@@ -4,6 +4,6 @@ import { PlanLibrary } from "./plans";
 
 export class Planner {
     planFor(intention: Intention, beliefs: BeliefBase) {
-        return PlanLibrary.getPlan(intention);
+        return PlanLibrary.getPlan(intention, beliefs);
     }
 }

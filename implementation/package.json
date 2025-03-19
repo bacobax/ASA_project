@@ -1,10 +1,10 @@
 {
-  "name": "ts-implementation-gpt",
+  "name": "implementation",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "node/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start" : "tsc && nodemon dist/index.js"
+    "build": "tsc --build",
+    "start": "node dist/index.js"
   },
   "author": "",
   "license": "ISC",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "ts-node": "^10.9.2"
   }
 }
