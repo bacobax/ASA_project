@@ -61,7 +61,7 @@ export class AgentBDI {
                     prevPosition:{x:agent.x, y:agent.y},
                     timestamp:timestamp,
                 });
-
+                // console.log("agentLogs id:", agent.id, "\nlogs:", agentLogs);
                 this.beliefs.updateBelief(agent.id, agentLogs);
             }
         })
