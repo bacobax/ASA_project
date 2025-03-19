@@ -1,5 +1,5 @@
 import { BeliefBase } from "./beliefs";
-import { Intention, Parcel } from "../types/types";
+import { Intention, Parcel, Position } from "../types/types";
 
 export class IntentionManager {
     private intentions: Intention[] = [];
@@ -13,6 +13,7 @@ export class IntentionManager {
     }
 
     reviseIntentions(beliefs: BeliefBase): void {
+        // console.log("Revision");
         this.intentions = this.intentions.filter(intention => {
             if (intention.type === "pickup") {
                 const visibleParcels = beliefs.getBelief<Parcel[]>("visibleParcels")?.filter(p => p.carriedBy == null);
@@ -24,10 +25,15 @@ export class IntentionManager {
             if (intention.type === "move") {
                 const visibleParcels = beliefs.getBelief<Parcel[]>("visibleParcels")?.filter(p => p.carriedBy == null);
                 if(visibleParcels?.length !== undefined && visibleParcels?.length>0){
+                    // console.log("there are visible parcels")
                     return false;
                 }
-                if(beliefs.getBelief("position") == intention.position){
-                    return false;
+                const destination = beliefs.getBelief("position") as Position;
+                if(intention.position){
+                    if(destination.x == intention.position.x && destination.y == intention.position.y){
+                        // console.log("removing move");
+                        return false;
+                    }
                 }
             }
             return true;

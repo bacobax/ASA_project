@@ -24,9 +24,16 @@ export interface MapConfig {
 export interface Agent {
     id: string;
     name: string;
-    position: Position;
+    x: number;
+    y: number;
     score: number;
 }
+
+export interface AgentLog{
+    prevPosition :Position;
+    timestamp: number;
+}
+
 
 export interface Parcel {
     id: string;

@@ -4,7 +4,7 @@ import { IntentionManager } from "./intentions";
 import { Planner } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { floydWarshallWithPaths, getTilePosition } from "./utils";
-import { MapConfig, Position, atomicActions } from "../types/types";
+import { MapConfig, Position, atomicActions, AgentLog } from "../types/types";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -44,6 +44,27 @@ export class AgentBDI {
             this.beliefs.updateBelief("visibleParcels", parcels);
             this.intentions.reviseIntentions(this.beliefs);
         });
+
+        this.api.onAgentsSensing(agents => {
+            this.beliefs.updateBelief("agents", agents);
+            const timestamp = Date.now()
+            for(let agent of agents){
+                if (this.beliefs.getBelief( agent.id ) == undefined){
+                    this.beliefs.updateBelief( agent.id, [] as AgentLog[] )
+                }
+                let agentLogs:AgentLog[] = this.beliefs.getBelief( agent.id ) as AgentLog[];
+                if ( agentLogs.length >0 ) {
+                    //we have previous knowledge of this agent
+                }
+
+                agentLogs.push({
+                    prevPosition:{x:agent.x, y:agent.y},
+                    timestamp:timestamp,
+                });
+
+                this.beliefs.updateBelief(agent.id, agentLogs);
+            }
+        })
 
         this.api.onMap((width, height, data) => {
             let map: MapConfig = {
