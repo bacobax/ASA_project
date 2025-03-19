@@ -12,6 +12,7 @@ class IntentionManager {
         this.intentions = this.intentions.filter(i => i !== intention);
     }
     reviseIntentions(beliefs) {
+        // console.log("Revision");
         this.intentions = this.intentions.filter(intention => {
             var _a, _b;
             if (intention.type === "pickup") {
@@ -24,10 +25,15 @@ class IntentionManager {
             if (intention.type === "move") {
                 const visibleParcels = (_b = beliefs.getBelief("visibleParcels")) === null || _b === void 0 ? void 0 : _b.filter(p => p.carriedBy == null);
                 if ((visibleParcels === null || visibleParcels === void 0 ? void 0 : visibleParcels.length) !== undefined && (visibleParcels === null || visibleParcels === void 0 ? void 0 : visibleParcels.length) > 0) {
+                    // console.log("there are visible parcels")
                     return false;
                 }
-                if (beliefs.getBelief("position") == intention.position) {
-                    return false;
+                const destination = beliefs.getBelief("position");
+                if (intention.position) {
+                    if (destination.x == intention.position.x && destination.y == intention.position.y) {
+                        // console.log("removing move");
+                        return false;
+                    }
                 }
             }
             return true;
