@@ -5,7 +5,7 @@ import { getTileIndex, getDeliverySpot } from "./utils";
 export class DesireGenerator {
     generateDesires(beliefs: BeliefBase): Intention[] {
         console.log("-----Generating Desires-----");
-        let desires: Intention[] = [];
+        const desires: Intention[] = [];
 
         const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
         const carryingParcels = parcels?.filter(parcel => parcel.carriedBy == beliefs.getBelief("id"));
@@ -24,7 +24,10 @@ export class DesireGenerator {
 
         if(desires.length==0){
             console.log("Desire pushed - move");
-            desires.push({type: "move", position: getDeliverySpot(beliefs.getBelief("position") as Position,3,beliefs)});
+            desires.push({
+                type: "move", 
+                position: getDeliverySpot(beliefs.getBelief("position") as Position, 3, beliefs)
+            });
         }
 
         return desires;

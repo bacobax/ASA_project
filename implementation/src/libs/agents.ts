@@ -9,10 +9,10 @@ import { MapConfig, Position, atomicActions, AgentLog } from "../types/types";
 export class AgentBDI {
     private api: DeliverooApi;
     private beliefs: BeliefBase = new BeliefBase();
-    private desires: DesireGenerator;
-    private intentions: IntentionManager;
-    private planner: Planner;
-    private currentPlan: atomicActions[] = [];
+    private desires: DesireGenerator; // belief -> intentions
+    private planner: Planner; // intentions -> atomic actions
+    private intentions: IntentionManager; // intentions stack
+    private currentPlan: atomicActions[] = []; 
     private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
     private isPlanRunning: boolean = false; // Flag to track if a plan is running
     private planAbortSignal: boolean = false; // Abort signal to stop the current plan
@@ -98,6 +98,8 @@ export class AgentBDI {
         this.intentions.reviseIntentions(this.beliefs);
     
         if (!this.intentions.hasIntentions() || this.planAbortSignal) {
+           
+
             if (this.isPlanRunning) {
                 console.log("Plan has been interrupted due to a new intention or invalid state.");
                 this.stopCurrentPlan();
@@ -124,6 +126,7 @@ export class AgentBDI {
     private async executePlan() {
         if (this.isPlanRunning) {
             console.log("Plan already running, aborting new execution.");
+
             return; // Prevent starting a new plan if one is already running
         }
 
