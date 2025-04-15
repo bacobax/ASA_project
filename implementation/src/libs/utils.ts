@@ -86,12 +86,12 @@ export function getOptimalPath(
         .filter(agent => agent.x !== startPos.x || agent.y !== startPos.y)
         .map(agent => ({ x: agent.x, y: agent.y }));
 
-    try {
+    // try {
         const path = aStarPath(startPos, endPos, mapConfig, obstacles);
         return convertPathToActions(path);
-    } catch (error) {
-        throw new Error("No path found from start to end.");
-    }
+    // } catch (error) {
+    //     throw new Error("No path found from start to end.");
+    // }
 }
 
 export function getKeyPos(pos: Position):string{
@@ -158,7 +158,7 @@ export function aStarPath(startPos: Position, endPos: Position, mapConfig: MapCo
         }
     }
 
-    throw new Error("No path found");
+    throw new Error(('No path found, from '+ JSON.stringify(startPos)+ ' to '+ JSON.stringify(endPos)));
 }
 
 function manhattanDistance(posA:Position, posB:Position): number{
@@ -212,17 +212,21 @@ function getNeighbors(
 }
 
 function reconstructPath(cameFrom: Map<string, MapTile>, current: MapTile): MapTile[] {
+    console.log("reconstructPath \ncurrent:", current, "\ncameFrom:", cameFrom);
     const path: MapTile[] = [current];
-    let curKey:string = getKeyTile(current);
+    let curKey: string = getKeyTile(current);
+
     while (cameFrom.has(curKey)) {
-        curKey = getKeyTile(current);
-        current = cameFrom.get(curKey)!;
-        path.unshift(current);
+        current = cameFrom.get(curKey)!;  
+        path.unshift(current);           
+        curKey = getKeyTile(current);    
     }
+
     return path;
 }
 
 function convertPathToActions(path: MapTile[]): atomicActions[] {
+    console.log("convertPathToActions path:", path);
     const actions: atomicActions[] = [];
     for (let i = 0; i < path.length - 1; i++) {
         const current = path[i];
