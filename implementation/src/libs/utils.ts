@@ -1,5 +1,6 @@
-import { MapTile, MapConfig, Position, atomicActions, Agent } from "../types/types";
+import { MapTile, MapConfig, Position, atomicActions, Agent, Intention } from "../types/types";
 import { BeliefBase } from "./beliefs";
+import { Planner } from "./planner";
 
 export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const { width, height, tiles } = mapConfig;
@@ -68,6 +69,12 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
     }
 
     return { dist, prev, paths };
+}
+interface getOptimalPathParams{
+    startPos:Position,
+    endpos:Position,
+    mapConfig:MapConfig,
+    beliefs:BeliefBase
 }
 
 export function getOptimalPath(
@@ -267,3 +274,20 @@ export function getDeliverySpot(startPos:Position, minMovement:number, beliefs:B
     return minDistancePos as Position;
 }
 
+
+interface firstExecutablePlanArgs{
+    intentions: Intention[],
+    beliefs: BeliefBase,
+    planner: Planner
+}
+
+type firstExecutablePlan = (args: firstExecutablePlanArgs) => { plan: atomicActions[], intention: Intention } | null;
+export const firstExecutablePlan: firstExecutablePlan = ({intentions, beliefs, planner}) => {
+    for (const intention of intentions) {
+        const potentialPlan = planner.planFor(intention, beliefs);
+        if (potentialPlan.length > 0) {
+            return {plan: potentialPlan, intention};
+        }
+    }
+    return null;
+};

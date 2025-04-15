@@ -3,8 +3,8 @@ import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
 import { Planner } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import { floydWarshallWithPaths, getTilePosition } from "./utils";
-import { MapConfig, Position, atomicActions, AgentLog } from "../types/types";
+import { firstExecutablePlan, floydWarshallWithPaths, getTilePosition } from "./utils";
+import { MapConfig, Position, atomicActions, AgentLog, Intention } from "../types/types";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -16,6 +16,7 @@ export class AgentBDI {
     private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
     private isPlanRunning: boolean = false; // Flag to track if a plan is running
     private planAbortSignal: boolean = false; // Abort signal to stop the current plan
+    
 
     constructor(api: DeliverooApi) {
         this.api = api;
@@ -94,6 +95,8 @@ export class AgentBDI {
         });
     }
 
+
+
     private deliberate() {
         this.intentions.reviseIntentions(this.beliefs);
     
@@ -106,19 +109,19 @@ export class AgentBDI {
             }
     
             const newDesires = this.desires.generateDesires(this.beliefs);
-            for (const desire of newDesires) {
-                const potentialPlan = this.planner.planFor(desire, this.beliefs);
-                if (potentialPlan.length > 0) {
-                    this.intentions.adoptIntention(desire);
-                    this.currentPlan = potentialPlan;
-                    this.executePlan();
-                    return; // Exit after finding and starting a valid plan
-                } else {
-                    console.log(`Plan for desire "${desire}" was invalid. Trying next desire...`);
-                }
+            const res = firstExecutablePlan({
+                intentions: newDesires,
+                planner: this.planner,
+                beliefs: this.beliefs,
+            })
+            if(res === null){
+                console.log("No valid desires found.");
+                return;
             }
-    
-            console.log("No valid plans found for any current desires.");
+            const {intention, plan} = res;
+            this.intentions.adoptIntention(intention);
+            this.currentPlan = plan;
+            this.executePlan();
         }
     }
     
@@ -126,7 +129,6 @@ export class AgentBDI {
     private async executePlan() {
         if (this.isPlanRunning) {
             console.log("Plan already running, aborting new execution.");
-
             return; // Prevent starting a new plan if one is already running
         }
 
