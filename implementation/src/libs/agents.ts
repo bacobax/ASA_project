@@ -96,22 +96,30 @@ export class AgentBDI {
 
     private deliberate() {
         this.intentions.reviseIntentions(this.beliefs);
-
+    
         if (!this.intentions.hasIntentions() || this.planAbortSignal) {
             if (this.isPlanRunning) {
                 console.log("Plan has been interrupted due to a new intention or invalid state.");
-                this.stopCurrentPlan(); // Stop the current plan if needed
+                this.stopCurrentPlan();
             }
-
+    
             const newDesires = this.desires.generateDesires(this.beliefs);
-            if (newDesires.length > 0) {
-                const newIntention = newDesires[0];
-                this.intentions.adoptIntention(newIntention);
-                this.currentPlan = this.planner.planFor(newIntention, this.beliefs);
-                this.executePlan();
+            for (const desire of newDesires) {
+                const potentialPlan = this.planner.planFor(desire, this.beliefs);
+                if (potentialPlan.length > 0) {
+                    this.intentions.adoptIntention(desire);
+                    this.currentPlan = potentialPlan;
+                    this.executePlan();
+                    return; // Exit after finding and starting a valid plan
+                } else {
+                    console.log(`Plan for desire "${desire}" was invalid. Trying next desire...`);
+                }
             }
+    
+            console.log("No valid plans found for any current desires.");
         }
     }
+    
 
     private async executePlan() {
         if (this.isPlanRunning) {

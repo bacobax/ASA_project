@@ -73,10 +73,8 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
 export function getOptimalPath(
     startPos: Position,
     endPos: Position,
-    mapWidth: number,
-    mapHeight: number,
-    mapConfig: MapConfig, // Add mapConfig parameter
-    beliefs: BeliefBase // Add beliefs to get agent positions
+    mapConfig: MapConfig,
+    beliefs: BeliefBase 
 ): atomicActions[] {
     if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
@@ -86,12 +84,12 @@ export function getOptimalPath(
         .filter(agent => agent.x !== startPos.x || agent.y !== startPos.y)
         .map(agent => ({ x: agent.x, y: agent.y }));
 
-    // try {
+     try {
         const path = aStarPath(startPos, endPos, mapConfig, obstacles);
         return convertPathToActions(path);
-    // } catch (error) {
-    //     throw new Error("No path found from start to end.");
-    // }
+    } catch (error) {
+        throw new Error("No path found from start to end.");
+    }
 }
 
 export function getKeyPos(pos: Position):string{

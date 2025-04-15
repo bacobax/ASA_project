@@ -14,39 +14,50 @@ export class PlanLibrary {
         switch (intention.type) {
             case "pickup":
                 if (intention.position && (intention.position.x !== curPos.x || intention.position.y !== curPos.y)) {
-                    actions = getOptimalPath(
-                        curPos, 
-                        intention.position, 
-                        map.width, 
-                        map.height,
-                        map, 
-                        beliefs 
-                    );
+                    try{
+                        actions = getOptimalPath(
+                            curPos, 
+                            intention.position, 
+                            map, 
+                            beliefs 
+                        );
+                        actions.push(atomicActions.pickup);
+                    }catch (error) {
+                        console.error("Error in pathfinding:", error);
+                        actions = [];
+                    }
                 }
-                actions.push(atomicActions.pickup);
+                
                 break;
             case "deliver":
                 const deliveryPos = getDeliverySpot(curPos, 0, beliefs);
-                actions = getOptimalPath(
-                    curPos, 
-                    deliveryPos, 
-                    map.width, 
-                    map.height,
-                    map, 
-                    beliefs 
-                );
-                actions.push(atomicActions.drop);
-                break;
-            case "move":
-                if (intention.position && (intention.position.x !== curPos.x || intention.position.y !== curPos.y)) {
+
+                try{
                     actions = getOptimalPath(
                         curPos, 
-                        intention.position, 
-                        map.width, 
-                        map.height,
+                        deliveryPos, 
                         map, 
                         beliefs 
                     );
+                    actions.push(atomicActions.drop);
+                }catch (error) {
+                    console.error("Error in pathfinding:", error);
+                    actions = [];
+                }
+                break;
+            case "move":
+                if (intention.position && (intention.position.x !== curPos.x || intention.position.y !== curPos.y)) {
+                    try{
+                        actions = getOptimalPath(
+                            curPos, 
+                            intention.position, 
+                            map, 
+                            beliefs 
+                        );
+                    }catch (error) {
+                        console.error("Error in pathfinding:", error);
+                        actions = [];
+                    }
                 }
                 break;
         }
