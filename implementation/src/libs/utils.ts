@@ -1,4 +1,4 @@
-import { MapTile, MapConfig, Position, atomicActions } from "../types/types";
+import { MapTile, MapConfig, Position, atomicActions, Agent } from "../types/types";
 import { BeliefBase } from "./beliefs";
 
 export function floydWarshallWithPaths(mapConfig: MapConfig) {
@@ -70,53 +70,168 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
     return { dist, prev, paths };
 }
 
-export function getOptimalPath(startPos:Position, endPos:Position,mapWidth:number, mapHeight:number, paths:Map<number, Map<number, MapTile[]>>):atomicActions[]{
-    if(startPos.x==endPos.x && startPos.y == endPos.y){
-        return [];
-    }
+export function getOptimalPath(
+    startPos: Position,
+    endPos: Position,
+    mapWidth: number,
+    mapHeight: number,
+    mapConfig: MapConfig, // Add mapConfig parameter
+    beliefs: BeliefBase // Add beliefs to get agent positions
+): atomicActions[] {
+    if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
-    const startTileIndex = getTileIndex(startPos, mapWidth);
-    const endTileIndex = getTileIndex(endPos, mapWidth);
+    // Get current agent positions (excluding self)
+    const agents = beliefs.getBelief<Agent[]>("agents") || [];
+    const obstacles = agents
+        .filter(agent => agent.x !== startPos.x || agent.y !== startPos.y)
+        .map(agent => ({ x: agent.x, y: agent.y }));
 
-    console.log(
-        'start index:',
-        startTileIndex,
-        ' Pos:',
-        getTilePosition(startTileIndex, mapWidth)
-      );
-
-      console.log(
-        'end index:',
-        endTileIndex,
-        ' Pos:',
-        getTilePosition(startTileIndex, mapWidth)
-      );
-
-    const path = paths.get(startTileIndex)?.get(endTileIndex);
-    if (!path) {
+    try {
+        const path = aStarPath(startPos, endPos, mapConfig, obstacles);
+        return convertPathToActions(path);
+    } catch (error) {
         throw new Error("No path found from start to end.");
     }
+}
 
-    const actions: atomicActions[] = [];
+export function getKeyPos(pos: Position):string{
+    return (pos.x+","+pos.y);
+}
 
-    // Convert path from MapTile[] to atomicActions
-    for (let i = 0; i < path.length - 1; i++) {
-        const currentTile = path[i];
-        const nextTile = path[i + 1];
+export function getKeyTile(tile: MapTile):string{
+    return (tile.x+","+tile.y);
+}
 
-        // Determine the direction from currentTile to nextTile and map to an atomic action
-        if (nextTile.x > currentTile.x) {
-            actions.push(atomicActions.moveRight);
-        } else if (nextTile.x < currentTile.x) {
-            actions.push(atomicActions.moveLeft);
-        } else if (nextTile.y > currentTile.y) {
-            actions.push(atomicActions.moveUp);
-        } else if (nextTile.y < currentTile.y) {
-            actions.push(atomicActions.moveDown);
+// Add these functions to utils.ts
+export function aStarPath(startPos: Position, endPos: Position, mapConfig: MapConfig, agents: Position[]): MapTile[] {
+    // console.log("a* from:", startPos, " to ", endPos);
+    
+    const { width, height, tiles } = mapConfig;
+    const validTiles = new Map<string, MapTile>();
+    tiles.forEach(tile => validTiles.set(getKeyTile(tile), tile));
+
+    const openSet: MapTile[] = [];
+    const closedSet = new Set<string>();
+    const cameFrom = new Map<string, MapTile>();
+    const gScore = new Map<string, number>();
+    const fScore = new Map<string, number>();
+
+    const startTile = validTiles.get(getKeyPos(startPos));
+    const endTile = validTiles.get(getKeyPos(endPos));
+    if (!startTile || !endTile) throw new Error("Invalid start or end position");
+
+    const agentsSet = new Set(agents.map(p => `${p.x},${p.y}`));
+
+    openSet.push(startTile);
+    gScore.set(getKeyPos(startPos), 0);
+    fScore.set(getKeyPos(startPos), manhattanDistance(startPos, endPos));
+    
+    while (openSet.length > 0) {
+        openSet.sort((a, b) => (fScore.get(getKeyTile(a)) ?? Infinity) - (fScore.get(getKeyTile(b)) ?? Infinity));
+        const current: MapTile = openSet.shift()!;
+
+        if (current.x === endTile.x && current.y === endTile.y) {
+            return reconstructPath(cameFrom, current);
+        }
+
+        closedSet.add(getKeyTile(current));
+
+        for (const neighbor of getNeighbors(current, validTiles, width, height, agentsSet)) {
             
+            const neighborKey = getKeyTile(neighbor);
+            if (closedSet.has(neighborKey)) continue;
+            const tentativeGScore = (gScore.get(getKeyTile(current)) ?? Infinity) + 1;
+            
+            // console.log("tentativeGScore:", tentativeGScore);
+
+            if (tentativeGScore < (gScore.get(neighborKey) || Infinity)) {
+                cameFrom.set(neighborKey, current);
+                gScore.set(neighborKey, tentativeGScore);
+                fScore.set(neighborKey, tentativeGScore + manhattanDistance(neighbor, endTile));
+                
+                if (!openSet.some(t => t.x === neighbor.x && t.y === neighbor.y)) {
+                    openSet.push(neighbor);
+                    // console.log("adding ", neighborKey);
+
+                }
+            }
         }
     }
 
+    throw new Error("No path found");
+}
+
+function manhattanDistance(posA:Position, posB:Position): number{
+    return Math.abs(posA.x - posB.x) + Math.abs(posA.y - posB.y);
+}
+
+function heuristic(a: MapTile, b: MapTile, agentsSet: Position[]): number {
+    const posA:Position = {x:a.x, y:a.y};
+    const posB:Position = {x:b.x, y:b.y};
+    let val = 0;
+    for(const agent of agentsSet) {
+        switch(manhattanDistance(posA, agent)){
+            case 1:
+                val+= 5;
+            case 2:
+                val+= 2;   
+        }
+    }
+
+    return val + manhattanDistance(posA, posB);
+
+}
+
+function getNeighbors(
+    tile: MapTile,
+    validTiles: Map<string, MapTile>,
+    width: number,
+    height: number,
+    obstacles: Set<string>
+): MapTile[] {
+    const neighbors: MapTile[] = [];
+    const directions = [
+        { dx: -1, dy: 0 },
+        { dx: 1, dy: 0 },
+        { dx: 0, dy: -1 },
+        { dx: 0, dy: 1 }
+    ];
+
+    for (const { dx, dy } of directions) {
+        const nx = tile.x + dx;
+        const ny = tile.y + dy;
+        const neighborKey = getKeyPos({x:nx, y:ny});
+        const neighbor = validTiles.get(neighborKey);
+        
+        if (neighbor && !obstacles.has(neighborKey) && nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            neighbors.push(neighbor);
+        }
+    }
+
+    return neighbors;
+}
+
+function reconstructPath(cameFrom: Map<string, MapTile>, current: MapTile): MapTile[] {
+    const path: MapTile[] = [current];
+    let curKey:string = getKeyTile(current);
+    while (cameFrom.has(curKey)) {
+        curKey = getKeyTile(current);
+        current = cameFrom.get(curKey)!;
+        path.unshift(current);
+    }
+    return path;
+}
+
+function convertPathToActions(path: MapTile[]): atomicActions[] {
+    const actions: atomicActions[] = [];
+    for (let i = 0; i < path.length - 1; i++) {
+        const current = path[i];
+        const next = path[i + 1];
+        if (next.x > current.x) actions.push(atomicActions.moveRight);
+        else if (next.x < current.x) actions.push(atomicActions.moveLeft);
+        else if (next.y > current.y) actions.push(atomicActions.moveUp);
+        else if (next.y < current.y) actions.push(atomicActions.moveDown);
+    }
     return actions;
 }
 
@@ -136,9 +251,9 @@ export function getDeliverySpot(startPos:Position, minMovement:number, beliefs:B
     let minDistancePos;
     for (let i = 0; i < deliveries.length; i++) {
         const pos:Position = {x:deliveries[i].x, y:deliveries[i].y};
-        console.log("----getDeliverySpot i:",i," -----");
-        console.log("startPos:", startPos);
-        console.log("endPos:", pos);
+        // console.log("----getDeliverySpot i:",i," -----");
+        // console.log("startPos:", startPos);
+        // console.log("endPos:", pos);
         const dist = distances[getTileIndex(startPos, map.width)][getTileIndex(pos, map.width)];
         if(dist >= minMovement && dist < minDistance){
             minDistance = dist;
@@ -149,5 +264,4 @@ export function getDeliverySpot(startPos:Position, minMovement:number, beliefs:B
 
     return minDistancePos as Position;
 }
-
 
