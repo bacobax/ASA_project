@@ -4,6 +4,7 @@ import { getCenterDirectionTilePosition, timeForPath } from "./utils/desireUtils
 import {  getNearestParcel, getNearestDeliverySpot } from "./utils/desireUtils";
 import { DECAY_INTERVAL, EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 import { getOptimalPath } from "./utils/pathfinding";
+import { planMultiPickupStrategy } from "./utils/planUtils";
 
 /**
  * Interface for reward calculation parameters
@@ -26,7 +27,7 @@ interface ReachableParcelArgs {
     filter?: (parcel: Parcel) => boolean;
 }
 
-export const getReachableParcels = ({ beliefs, filter }: ReachableParcelArgs): ReachableParcel[] => {
+export const getReachableParcels = ({ beliefs, filter }: ReachableParcelArgs): Parcel[] => {
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
     const curPos = beliefs.getBelief<Position>("position");
     const map = beliefs.getBelief<MapConfig>("map");
@@ -35,14 +36,14 @@ export const getReachableParcels = ({ beliefs, filter }: ReachableParcelArgs): R
 
     const uncarried = parcels.filter(p => !p.carriedBy && (!filter || filter(p)));
 
-    const reachable: ReachableParcel[] = [];
+    const reachable: Parcel[] = [];
 
     for (const parcel of uncarried) {
         const path = getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, map, beliefs);
         if (!path) continue;
 
         const time = timeForPath({ path }).time;
-        reachable.push({ parcel, path, time });
+        reachable.push(parcel);
     }
 
     return reachable;
@@ -102,107 +103,27 @@ export class DesireGenerator {
     }
 
 
-private considerAdditionalPickup(
-    parcels: Parcel[] | undefined,
-    beliefs: BeliefBase,
-    carryingParcels: Parcel[]
-): Intention | null {
-    const reachableParcels = getReachableParcels({ beliefs });
-
-    if (reachableParcels.length === 0) return null;
-
-    const deliverySpot = getNearestDeliverySpot({
-        startPosition: beliefs.getBelief("position") as Position,
-        beliefs
-    });
-
-    if (!deliverySpot) return null;
-
-    const baseDeliveryTime = deliverySpot.time;
-    const baseReward = carryingParcels.reduce(
-        (acc, p) => acc + p.reward * Math.exp(-baseDeliveryTime / DECAY_INTERVAL),
-        0
-    );
-
-    let bestParcel: Parcel | null = null;
-    let bestGain = -Infinity;
-
-    for (const { parcel, time: fromMeToParcelTime } of reachableParcels) {
-        const delivery = getNearestDeliverySpot({
-            startPosition: { x: parcel.x, y: parcel.y },
-            beliefs
-        });
-        if (!delivery) continue;
-
-        const totalTime = fromMeToParcelTime + delivery.time;
-        const minExpire = this.calculateMinExpirationTime(carryingParcels);
-        if (!this.canPickupAdditionalParcel(totalTime, minExpire)) continue;
-
-        const totalReward = [
-            ...carryingParcels.map(p => p.reward * Math.exp(-totalTime / DECAY_INTERVAL)),
-            parcel.reward * Math.exp(-totalTime / DECAY_INTERVAL)
-        ].reduce((a, b) => a + b, 0);
-
-        const gain = totalReward - baseReward;
-        if (gain > 0 && gain > bestGain) {
-            bestGain = gain;
-            bestParcel = parcel;
+    private considerAdditionalPickup(
+        parcels: Parcel[] | undefined,
+        beliefs: BeliefBase,
+        carryingParcels: Parcel[]
+    ): Intention | null {
+        const reachableParcels = getReachableParcels({ beliefs });
+        if (reachableParcels.length === 0) return null;
+    
+        const result = planMultiPickupStrategy(beliefs, carryingParcels, reachableParcels);
+        if (!result) return null;
+    
+        if (result.plan.some(step => step.action === "pickup")) {
+            return {
+                type: desireType.PICKUP,
+                possilbeParcels: result.plan.filter(p => p.action === "pickup").map(p => p.parcel),
+            };
         }
-    }
-
-    return bestParcel
-        ? {
-              type: desireType.PICKUP,
-              possilbeParcels: [bestParcel],
-          }
-        : null;
-}
-    /**
-     * Evaluates whether to pick up additional parcels while carrying others
-     */
-    private old_considerAdditionalPickup(parcels: Parcel[] | undefined, beliefs: BeliefBase, carryingParcels: Parcel[]): Intention | null{
-        const uncarriedParcels = parcels?.filter(parcel => parcel.carriedBy === null);
-        if (!uncarriedParcels || uncarriedParcels.length === 0) return null;
-
-        const nearestParcelResult = getNearestParcel({ beliefs });
-        if (!nearestParcelResult) {
-            console.log("All paths to parcels are blocked");
-            return null;
-        }
-
-        const { parcel, time: fromMeToParcelTime } = nearestParcelResult;
-        const deliverySpotResult = getNearestDeliverySpot({
-            startPosition: { x: parcel.x, y: parcel.y },
-            beliefs
-        });
-
-        if (!deliverySpotResult) {
-            console.log("All paths to delivery are blocked");
-            return null;
-        }
-
-        const { time: fromParcelToDeliveryTime } = deliverySpotResult;
-        const timeForSecondaryPath = fromMeToParcelTime + fromParcelToDeliveryTime;
-        const minExpirationTimeInMS = this.calculateMinExpirationTime(carryingParcels);
-
-        if (this.canPickupAdditionalParcel(timeForSecondaryPath, minExpirationTimeInMS)) {
-            const { deliverCarrying, pickupAnother } = this.calculateRewards({
-                optionalParcel: parcel,
-                carryingParcels,
-                timeForSecondaryPath,
-                beliefs
-            });
-
-            if (pickupAnother > deliverCarrying) {
-                return {
-                    type: desireType.PICKUP,
-                    possilbeParcels: [parcel],
-                }
-            }
-        }
+    
         return null;
     }
-
+   
     /**
      * Calculates rewards for different delivery strategies
      */
