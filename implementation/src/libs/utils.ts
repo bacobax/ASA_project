@@ -1,7 +1,8 @@
-import { MapTile, MapConfig, Position, atomicActions, Agent, Intention } from "../types/types";
+import { MapTile, MapConfig, Position, atomicActions, Agent, Intention, Parcel } from "../types/types";
 import { BeliefBase } from "./beliefs";
 import { Planner } from "./planner";
-
+export const DECAY_INTERVAL = 1000; // -1 reward per second
+export const MOVEMENT_SPEED = 1000; // 1 tile per second
 export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const { width, height, tiles } = mapConfig;
     const numTiles = width * height;
@@ -82,7 +83,7 @@ export function getOptimalPath(
     endPos: Position,
     mapConfig: MapConfig,
     beliefs: BeliefBase 
-): atomicActions[] {
+): atomicActions[] | null {
     if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
     // Get current agent positions (excluding self)
@@ -95,7 +96,7 @@ export function getOptimalPath(
         const path = aStarPath(startPos, endPos, mapConfig, obstacles);
         return convertPathToActions(path);
     } catch (error) {
-        throw new Error("No path found from start to end.");
+        return null
     }
 }
 
@@ -291,3 +292,76 @@ export const firstExecutablePlan: firstExecutablePlan = ({intentions, beliefs, p
     }
     return null;
 };
+
+
+export const timeForPath = ({path}:{path: atomicActions[]})=> {
+    return {time: path.length * MOVEMENT_SPEED};
+}
+
+export const getNearestParcel = ({beliefs}:{beliefs:BeliefBase}):{parcel: Parcel, path: atomicActions[], time:number} | null => {
+    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+    const curPos = beliefs.getBelief<Position>("position");
+    const map = beliefs.getBelief<MapConfig>("map");
+    const agentId = beliefs.getBelief<string>("id");
+
+    if(!parcels || !curPos || !map || !agentId) throw new Error("Missing beliefs");
+
+
+    const [firstParcel, ...rest] = parcels.filter(p => !p.carriedBy);
+    if (!firstParcel) return null; // No available parcels to pick up
+
+    const pathToFirst = getOptimalPath(curPos, {x:firstParcel.x, y:firstParcel.y}, map, beliefs);
+    let minLength;
+    let minParcel;
+    let minPath;
+
+    if(pathToFirst != null){
+        minLength = pathToFirst.length;
+        minParcel = firstParcel;
+        minPath = pathToFirst;
+    }else{
+        minLength = Infinity;
+        minParcel = null;
+        minPath = null;
+    }
+
+    for(const parcel of rest){
+        const path = getOptimalPath(
+            curPos, 
+            {x:parcel.x, y:parcel.y}, 
+            map, 
+            beliefs);
+        
+        if(path == null) continue;
+
+        const length = path.length;
+        if(length < minLength){
+            minLength = length;
+            minParcel = parcel;
+            minPath = path;
+        }
+    }
+
+    if(minParcel == null || minPath == null) return null;
+
+    return {parcel: minParcel, path: minPath, time: timeForPath({path: minPath}).time};
+}
+
+interface getNearestDeliverySpotArgs{
+    startPosition:Position,
+    beliefs:BeliefBase
+}
+
+export const getNearestDeliverySpot = ({startPosition,beliefs}: getNearestDeliverySpotArgs) => {
+    const deliveryPosition = getDeliverySpot(startPosition, 1, beliefs);
+    
+    const path = getOptimalPath(
+        startPosition,
+        deliveryPosition,
+        beliefs.getBelief("map") as MapConfig,
+        beliefs
+    );
+    if(path == null) return null;
+    const {time} = timeForPath({ path });
+    return {deliveryPosition, path, time};
+}
