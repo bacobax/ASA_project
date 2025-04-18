@@ -1,8 +1,7 @@
+import { MOVEMENT_SPEED } from "../config";
 import { MapTile, MapConfig, Position, atomicActions, Agent, Intention, Parcel } from "../types/types";
 import { BeliefBase } from "./beliefs";
 import { Planner } from "./planner";
-export const DECAY_INTERVAL = 1000; // -1 reward per second
-export const MOVEMENT_SPEED = 1000; // 1 tile per second
 export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const { width, height, tiles } = mapConfig;
     const numTiles = width * height;
@@ -365,3 +364,40 @@ export const getNearestDeliverySpot = ({startPosition,beliefs}: getNearestDelive
     const {time} = timeForPath({ path });
     return {deliveryPosition, path, time};
 }
+
+
+/**
+ * Returns a valid tile position that is `nStep` moves toward the center of the map.
+ * Uses A* path to ensure valid navigation, avoiding obstacles or blocked tiles.
+ */
+export const getCenterDirectionTilePosition = (
+    nStep: number,
+    position: Position,
+    beliefs: BeliefBase
+): Position => {
+    const map = beliefs.getBelief<MapConfig>("map");
+    if (!map) throw new Error("Missing map");
+
+    const center: Position = {
+        x: Math.floor(map.width / 2),
+        y: Math.floor(map.height / 2),
+    };
+
+    const agents = beliefs.getBelief<Agent[]>("agents") || [];
+
+    const obstacles = agents
+        .filter(agent => agent.x !== position.x || agent.y !== position.y)
+        .map(agent => ({ x: agent.x, y: agent.y }));
+
+    const path = aStarPath(position, center, map, obstacles);
+
+    if (!path || path.length === 0) {
+        throw new Error(`No path found from (${position.x},${position.y}) to map center`);
+    }
+
+    // Return tile that is exactly nStep away from current position,
+    // or the farthest reachable one along the path
+    const stepIndex = Math.min(nStep, path.length - 1);
+    const targetTile = path[stepIndex];
+    return { x: targetTile.x, y: targetTile.y };
+};

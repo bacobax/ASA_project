@@ -1,6 +1,7 @@
 import { BeliefBase } from "./beliefs";
 import { Intention, Parcel, Position } from "../types/types";
-import { getDeliverySpot, getNearestParcel, getNearestDeliverySpot, DECAY_INTERVAL } from "./utils";
+import { getDeliverySpot, getNearestParcel, getNearestDeliverySpot, getCenterDirectionTilePosition } from "./utils";
+import { DECAY_INTERVAL, EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 
 /**
  * Interface for reward calculation parameters
@@ -92,9 +93,17 @@ export class DesireGenerator {
      */
     private addExplorationDesire(beliefs: BeliefBase, desires: Intention[]): void {
         console.log("Desire pushed - move");
+        // desires.push({
+        //     type: "move",
+        //     position: getDeliverySpot(beliefs.getBelief("position") as Position, 3, beliefs)
+        // });
         desires.push({
             type: "move",
-            position: getDeliverySpot(beliefs.getBelief("position") as Position, 3, beliefs)
+            position: getCenterDirectionTilePosition(
+                EXPLORATION_STEP_TOWARDS_CENTER, 
+                beliefs.getBelief("position") as Position, 
+                beliefs
+            )
         });
     }
 
