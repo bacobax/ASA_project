@@ -1,7 +1,9 @@
 import { BeliefBase } from "./beliefs";
-import { Intention, Parcel, Position } from "../types/types";
-import { getDeliverySpot, getNearestParcel, getNearestDeliverySpot, getCenterDirectionTilePosition } from "./utils";
+import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } from "../types/types";
+import { getCenterDirectionTilePosition, timeForPath } from "./utils/desireUtils";
+import {  getNearestParcel, getNearestDeliverySpot } from "./utils/desireUtils";
 import { DECAY_INTERVAL, EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
+import { getOptimalPath } from "./utils/pathfinding";
 
 /**
  * Interface for reward calculation parameters
@@ -13,6 +15,38 @@ interface RewardCalculationParams {
     beliefs: BeliefBase;
 }
 
+export interface ReachableParcel {
+    parcel: Parcel;
+    path: atomicActions[];
+    time: number;
+}
+
+interface ReachableParcelArgs {
+    beliefs: BeliefBase;
+    filter?: (parcel: Parcel) => boolean;
+}
+
+export const getReachableParcels = ({ beliefs, filter }: ReachableParcelArgs): ReachableParcel[] => {
+    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+    const curPos = beliefs.getBelief<Position>("position");
+    const map = beliefs.getBelief<MapConfig>("map");
+
+    if (!parcels || !curPos || !map) throw new Error("Missing beliefs");
+
+    const uncarried = parcels.filter(p => !p.carriedBy && (!filter || filter(p)));
+
+    const reachable: ReachableParcel[] = [];
+
+    for (const parcel of uncarried) {
+        const path = getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, map, beliefs);
+        if (!path) continue;
+
+        const time = timeForPath({ path }).time;
+        reachable.push({ parcel, path, time });
+    }
+
+    return reachable;
+};
 /**
  * DesireGenerator class handles the generation of desires (intentions) based on the agent's beliefs
  * and current state. It implements a reward-based decision-making system for parcel delivery.
@@ -23,101 +57,117 @@ export class DesireGenerator {
      * @param beliefs Current belief base of the agent
      * @returns Array of intentions representing desires
      */
+    /**
+     * Generates all possible intentions based on the agent's current belief base.
+     */
     generateDesires(beliefs: BeliefBase): Intention[] {
-        console.log("-----Generating Desires-----");
+        console.log("-----Generating Desire Options-----");
         const desires: Intention[] = [];
+
         const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
-        const carryingParcels = this.getCarryingParcels(beliefs, parcels);
+        const curPos: Position = beliefs.getBelief("position") as Position;
+        const agentId = beliefs.getBelief<string>("id");
+        const carryingParcels = parcels?.filter(p => p.carriedBy === agentId) ?? [];
 
-        if (this.isCarryingParcels(carryingParcels)) {
-            this.handleCarryingParcels(parcels ?? [], beliefs, carryingParcels!, desires);
+        if (carryingParcels.length > 0) {
+            // Try to pick up more if possible
+            const pickup = this.considerAdditionalPickup(parcels, beliefs, carryingParcels);
+            if (pickup) desires.push(pickup)
+            desires.push({ type: desireType.DELIVER });
+
+            // Deliver what you're carrying
+            //desires.push({ type: desireType.DELIVER });
+        } else if (parcels && parcels.length > 0) {
+            // Attempt pickup of available parcels
+            const pickupCandidates = parcels.filter(p => p.x !== curPos.x || p.y !== curPos.y);
+            if (pickupCandidates.length > 0) {
+                desires.push({
+                    type: desireType.PICKUP,
+                    possilbeParcels: pickupCandidates,
+                });
+            }
         }
 
-        this.handleAvailableParcels(parcels, desires);
-
-        if (this.shouldExplore(desires)) {
-            this.addExplorationDesire(beliefs, desires);
-        }
+        // Always have a fallback desire to explore
+        desires.push({
+            type: desireType.MOVE,
+            position: getCenterDirectionTilePosition(
+                EXPLORATION_STEP_TOWARDS_CENTER,
+                curPos,
+                beliefs
+            ),
+        });
 
         return desires;
     }
 
-    /**
-     * Retrieves parcels currently being carried by the agent
-     */
-    private getCarryingParcels(beliefs: BeliefBase, parcels: Parcel[] | undefined): Parcel[] | undefined {
-        return parcels?.filter(parcel => parcel.carriedBy === beliefs.getBelief("id"));
-    }
 
-    /**
-     * Checks if the agent is carrying any parcels
-     */
-    private isCarryingParcels(carryingParcels: Parcel[] | undefined): boolean {
-        return Boolean(carryingParcels && carryingParcels.length > 0);
-    }
+private considerAdditionalPickup(
+    parcels: Parcel[] | undefined,
+    beliefs: BeliefBase,
+    carryingParcels: Parcel[]
+): Intention | null {
+    const reachableParcels = getReachableParcels({ beliefs });
 
-    /**
-     * Handles the logic for when the agent is carrying parcels
-     */
-    private handleCarryingParcels(parcels: Parcel[] | undefined, beliefs: BeliefBase, carryingParcels: Parcel[], desires: Intention[]): void {
-        this.considerAdditionalPickup(parcels, beliefs, carryingParcels, desires);
-        console.log("Desire pushed - deliver");
-        desires.push({ type: "deliver" });
-    }
+    if (reachableParcels.length === 0) return null;
 
-    /**
-     * Processes available parcels and adds pickup desires
-     */
-    private handleAvailableParcels(parcels: Parcel[] | undefined, desires: Intention[]): void {
-        if (!parcels) return;
+    const deliverySpot = getNearestDeliverySpot({
+        startPosition: beliefs.getBelief("position") as Position,
+        beliefs
+    });
 
-        for (const parcel of parcels) {
-            console.log("Desire pushed - pickup:", parcel);
-            desires.push({
-                type: "pickup",
-                parcelId: parcel.id,
-                position: { x: parcel.x, y: parcel.y }
-            });
+    if (!deliverySpot) return null;
+
+    const baseDeliveryTime = deliverySpot.time;
+    const baseReward = carryingParcels.reduce(
+        (acc, p) => acc + p.reward * Math.exp(-baseDeliveryTime / DECAY_INTERVAL),
+        0
+    );
+
+    let bestParcel: Parcel | null = null;
+    let bestGain = -Infinity;
+
+    for (const { parcel, time: fromMeToParcelTime } of reachableParcels) {
+        const delivery = getNearestDeliverySpot({
+            startPosition: { x: parcel.x, y: parcel.y },
+            beliefs
+        });
+        if (!delivery) continue;
+
+        const totalTime = fromMeToParcelTime + delivery.time;
+        const minExpire = this.calculateMinExpirationTime(carryingParcels);
+        if (!this.canPickupAdditionalParcel(totalTime, minExpire)) continue;
+
+        const totalReward = [
+            ...carryingParcels.map(p => p.reward * Math.exp(-totalTime / DECAY_INTERVAL)),
+            parcel.reward * Math.exp(-totalTime / DECAY_INTERVAL)
+        ].reduce((a, b) => a + b, 0);
+
+        const gain = totalReward - baseReward;
+        if (gain > 0 && gain > bestGain) {
+            bestGain = gain;
+            bestParcel = parcel;
         }
     }
 
-    /**
-     * Determines if the agent should explore
-     */
-    private shouldExplore(desires: Intention[]): boolean {
-        return desires.length === 0;
-    }
-
-    /**
-     * Adds exploration desire when no other desires exist
-     */
-    private addExplorationDesire(beliefs: BeliefBase, desires: Intention[]): void {
-        console.log("Desire pushed - move");
-        // desires.push({
-        //     type: "move",
-        //     position: getDeliverySpot(beliefs.getBelief("position") as Position, 3, beliefs)
-        // });
-        desires.push({
-            type: "move",
-            position: getCenterDirectionTilePosition(
-                EXPLORATION_STEP_TOWARDS_CENTER, 
-                beliefs.getBelief("position") as Position, 
-                beliefs
-            )
-        });
-    }
-
+    return bestParcel
+        ? {
+              type: desireType.PICKUP,
+              possilbeParcels: [bestParcel],
+          }
+        : null;
+}
     /**
      * Evaluates whether to pick up additional parcels while carrying others
      */
-    private considerAdditionalPickup(parcels: Parcel[] | undefined, beliefs: BeliefBase, carryingParcels: Parcel[], desires: Intention[]): void {
+    private old_considerAdditionalPickup(parcels: Parcel[] | undefined, beliefs: BeliefBase, carryingParcels: Parcel[]): Intention | null{
         const uncarriedParcels = parcels?.filter(parcel => parcel.carriedBy === null);
-        if (!uncarriedParcels || uncarriedParcels.length === 0) return;
+        if (!uncarriedParcels || uncarriedParcels.length === 0) return null;
 
         const nearestParcelResult = getNearestParcel({ beliefs });
         if (!nearestParcelResult) {
             console.log("All paths to parcels are blocked");
-            return;
+            return null;
         }
 
         const { parcel, time: fromMeToParcelTime } = nearestParcelResult;
@@ -128,7 +178,7 @@ export class DesireGenerator {
 
         if (!deliverySpotResult) {
             console.log("All paths to delivery are blocked");
-            return;
+            return null;
         }
 
         const { time: fromParcelToDeliveryTime } = deliverySpotResult;
@@ -144,9 +194,13 @@ export class DesireGenerator {
             });
 
             if (pickupAnother > deliverCarrying) {
-                this.addPickupDesire(parcel, desires);
+                return {
+                    type: desireType.PICKUP,
+                    possilbeParcels: [parcel],
+                }
             }
         }
+        return null;
     }
 
     /**
@@ -174,8 +228,8 @@ export class DesireGenerator {
             .reduce((acc, cur) => acc + cur, 0);
 
         return {
-            pickupAnother: totalRewardAtDeliverySecondaryPath / timeForSecondaryPath,
-            deliverCarrying: totalRewardAtDeliveryPrimaryPath / time
+            pickupAnother: totalRewardAtDeliverySecondaryPath,
+            deliverCarrying: totalRewardAtDeliveryPrimaryPath
         };
     }
 
@@ -193,14 +247,5 @@ export class DesireGenerator {
         return timeForSecondaryPath < minExpirationTimeInMS;
     }
 
-    /**
-     * Adds pickup desire for a specific parcel
-     */
-    private addPickupDesire(parcel: Parcel, desires: Intention[]): void {
-        desires.push({
-            type: "pickup",
-            parcelId: parcel.id,
-            position: { x: parcel.x, y: parcel.y }
-        });
-    }
+  
 }

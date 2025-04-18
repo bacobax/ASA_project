@@ -7,6 +7,7 @@ export interface Intention {
     type: desireType;
     parcelId?: string;
     position?: Position;
+    possilbeParcels?: Parcel[];
 }
 
 export interface MapTile {

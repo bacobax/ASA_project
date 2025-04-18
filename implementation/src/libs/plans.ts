@@ -1,64 +1,70 @@
-import { Intention, atomicActions, Position, MapConfig, MapTile, Agent, desireType } from "../types/types";
+import { Intention, atomicActions, Position, MapConfig, desireType } from "../types/types";
 import { BeliefBase } from "./beliefs";
-import { getOptimalPath, getDeliverySpot } from "./utils";
+import { getDeliverySpot } from "./utils/mapUtils";
+import { getOptimalPath } from "./utils/pathfinding";
+import { parcelsCompare } from "./utils/planUtils";
 
+export function handlePickup(intention: Intention, beliefs: BeliefBase): atomicActions[] {
+    const curPos = beliefs.getBelief<Position>("position")!;
+    const map = beliefs.getBelief<MapConfig>("map")!;
 
-export class PlanLibrary {
-    static getPlan(intention: Intention, beliefs: BeliefBase): atomicActions[] {
-        const curPos: Position = beliefs.getBelief("position") as Position;
-        const map: MapConfig = beliefs.getBelief("map") as MapConfig;
-        const agents = beliefs.getBelief<Agent[]>("agents") || [];
-        
-        let actions: atomicActions[] | null = [];
-        
-        switch (intention.type) {
-            case desireType.PICKUP:
-                if (intention.position && (intention.position.x !== curPos.x || intention.position.y !== curPos.y)) {
-                        actions = getOptimalPath(
-                            curPos, 
-                            intention.position, 
-                            map, 
-                            beliefs 
-                        );
-                        if(actions === null){
-                            console.error("Error in pathfinding");
-                            actions = [];
-                        }else{
-                            actions.push(atomicActions.pickup);
-                        }
-                }
-                break;
-            case desireType.DELIVER:
-                const deliveryPos = getDeliverySpot(curPos, 0, beliefs);
-
-                actions = getOptimalPath(
-                    curPos, 
-                    deliveryPos, 
-                    map, 
-                    beliefs 
-                );
-                if (actions === null) {
-                    console.error("Error in pathfinding");
-                    actions = [];
-                } else {
-                    actions.push(atomicActions.drop);
-                }
-                break;
-            case desireType.MOVE:
-                if (intention.position && (intention.position.x !== curPos.x || intention.position.y !== curPos.y)) {
-                    actions = getOptimalPath(
-                        curPos, 
-                        intention.position, 
-                        map, 
-                        beliefs 
-                    );
-                    if (actions === null) {
-                        console.error("Error in pathfinding");
-                        actions = [];
-                    }
-                }
-                break;
-        }
-        return actions;
+    if (!intention.possilbeParcels || intention.possilbeParcels.length === 0) {
+        console.error("No parcels available for pickup");
+        return [];
     }
+
+    const sorted = intention.possilbeParcels
+        .map(p => {
+            const path = getOptimalPath(curPos, { x: p.x, y: p.y }, map, beliefs);
+            return {
+                ...p,
+                distance: path ? path.length : Infinity,
+                path: path ?? null,
+            };
+        })
+        .sort(parcelsCompare);
+
+    const bestPath = sorted[0]?.path;
+    if (!bestPath) {
+        console.error("Error in pathfinding");
+        return [];
+    }
+
+    bestPath.push(atomicActions.pickup);
+    return bestPath;
 }
+
+export function handleDeliver(intention: Intention, beliefs: BeliefBase): atomicActions[] {
+    const curPos = beliefs.getBelief<Position>("position")!;
+    const map = beliefs.getBelief<MapConfig>("map")!;
+    const deliveryPos = getDeliverySpot(curPos, 0, beliefs);
+
+    const path = getOptimalPath(curPos, deliveryPos, map, beliefs);
+    if (!path) {
+        console.error("Error in pathfinding");
+        return [];
+    }
+
+    path.push(atomicActions.drop);
+    return path;
+}
+
+export function handleMove(intention: Intention, beliefs: BeliefBase): atomicActions[] {
+    const curPos = beliefs.getBelief<Position>("position")!;
+    const map = beliefs.getBelief<MapConfig>("map")!;
+
+    if (
+        intention.position &&
+        (intention.position.x !== curPos.x || intention.position.y !== curPos.y)
+    ) {
+        const path = getOptimalPath(curPos, intention.position, map, beliefs);
+        if (!path) {
+            console.error("Error in pathfinding");
+            return [];
+        }
+        return path;
+    }
+
+    return [];
+}
+

@@ -1,28 +1,39 @@
 import { BeliefBase } from "./beliefs";
 import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
-import { Planner } from "./planner";
+import { planFor } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import { firstExecutablePlan, floydWarshallWithPaths, getTilePosition } from "./utils";
-import { MapConfig, Position, atomicActions, AgentLog, Intention } from "../types/types";
+import { floydWarshallWithPaths } from "./utils/pathfinding";
+import { getCenterDirectionTilePosition } from "./utils/desireUtils";
+
+import {
+    MapConfig,
+    Position,
+    atomicActions,
+    AgentLog,
+    Intention,
+    desireType
+} from "../types/types";
+import { EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 
 export class AgentBDI {
     private api: DeliverooApi;
     private beliefs: BeliefBase = new BeliefBase();
-    private desires: DesireGenerator; // belief -> intentions
-    private planner: Planner; // intentions -> atomic actions
-    private intentions: IntentionManager; // intentions stack
-    private currentPlan: atomicActions[] = []; 
-    private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
-    private isPlanRunning: boolean = false; // Flag to track if a plan is running
-    private planAbortSignal: boolean = false; // Abort signal to stop the current plan
+    private desires: DesireGenerator;
     
+    private intentions: IntentionManager;
+    private currentPlan: atomicActions[] = [];
+    private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
+    private isPlanRunning = false;
+    private planAbortSignal = false;
+    private isDeliberating = false;
+    private readonly MAX_PLAN_ATTEMPTS = 5;
 
     constructor(api: DeliverooApi) {
         this.api = api;
         this.desires = new DesireGenerator();
         this.intentions = new IntentionManager();
-        this.planner = new Planner();
+        
 
         this.atomicActionToApi.set(atomicActions.moveRight, api => api.move("right"));
         this.atomicActionToApi.set(atomicActions.moveLeft, api => api.move("left"));
@@ -48,120 +59,139 @@ export class AgentBDI {
 
         this.api.onAgentsSensing(agents => {
             this.beliefs.updateBelief("agents", agents);
-            const timestamp = Date.now()
-            for(let agent of agents){
-                if (this.beliefs.getBelief( agent.id ) == undefined){
-                    this.beliefs.updateBelief( agent.id, [] as AgentLog[] )
+            const timestamp = Date.now();
+            for (let agent of agents) {
+                if (this.beliefs.getBelief(agent.id) === undefined) {
+                    this.beliefs.updateBelief(agent.id, [] as AgentLog[]);
                 }
-                let agentLogs:AgentLog[] = this.beliefs.getBelief( agent.id ) as AgentLog[];
-                if ( agentLogs.length >0 ) {
-                    //we have previous knowledge of this agent
-                }
-
+                const agentLogs: AgentLog[] = this.beliefs.getBelief(agent.id) as AgentLog[];
                 agentLogs.push({
-                    prevPosition:{x:agent.x, y:agent.y},
-                    timestamp:timestamp,
+                    prevPosition: { x: agent.x, y: agent.y },
+                    timestamp
                 });
-                // console.log("agentLogs id:", agent.id, "\nlogs:", agentLogs);
                 this.beliefs.updateBelief(agent.id, agentLogs);
             }
-        })
+        });
 
         this.api.onMap((width, height, data) => {
-            let map: MapConfig = {
-                width: width,
-                height: height,
+            const map: MapConfig = {
+                width,
+                height,
                 tiles: data
             };
-
             this.beliefs.updateBelief("map", map);
             const { dist, prev, paths } = floydWarshallWithPaths(map);
-            // for(let i = 0; i<100; i++){
-            //     for(let j = 0; j<100; j++){
-            //         if(i!=j){
-            //             if(dist[i][j]!=Infinity){
-            //                 console.log("--------from ", getTilePosition(i, 10), " to ", getTilePosition(j, 10),":");
-            //                 console.log(dist[i][j]);
-            //             }
-            //         }
-            //     }
-            // }
             this.beliefs.updateBelief("dist", dist);
             this.beliefs.updateBelief("prev", prev);
             this.beliefs.updateBelief("paths", paths);
             this.beliefs.updateBelief("deliveries", map.tiles.filter(tile => tile.delivery === true));
 
-            setInterval(() => this.deliberate(), 1000);
+            setInterval(async () => {
+                try {
+                    await this.deliberate();
+                } catch (err) {
+                    console.error("Deliberation error:", err);
+                }
+            }, 1000);
         });
     }
 
-
-
-    private deliberate() {
-        this.intentions.reviseIntentions(this.beliefs);
+    private async deliberate(): Promise<void> {
+        if (this.isPlanRunning || this.isDeliberating) return;
+        this.isDeliberating = true;
     
-        if (!this.intentions.hasIntentions() || this.planAbortSignal) {
-           
-
-            if (this.isPlanRunning) {
-                console.log("Plan has been interrupted due to a new intention or invalid state.");
-                this.stopCurrentPlan();
-            }
+        try {
+            this.intentions.reviseIntentions(this.beliefs);
     
-            const newDesires = this.desires.generateDesires(this.beliefs);
-            const res = firstExecutablePlan({
-                intentions: newDesires,
-                planner: this.planner,
-                beliefs: this.beliefs,
-            })
-            if(res === null){
-                console.log("No valid desires found.");
-                return;
+            const currentIntention = this.intentions.getCurrentIntention();
+    
+            if (!currentIntention || this.planAbortSignal) {
+                if (this.isPlanRunning) {
+                    this.stopCurrentPlan();
+                }
+    
+                const possibleDesires = this.desires.generateDesires(this.beliefs);
+    
+                for (const desire of possibleDesires) {
+                    const plan = planFor(desire, this.beliefs);
+                    if (plan && plan.length > 0) {
+                        this.intentions.adoptIntention(desire);
+                        this.currentPlan = plan;
+                        return this.executePlan();
+                    }
+                }
+    
+                const fallbackIntention: Intention = {
+                    type: desireType.MOVE,
+                    position: getCenterDirectionTilePosition(
+                        EXPLORATION_STEP_TOWARDS_CENTER,
+                        this.beliefs.getBelief("position") as Position,
+                        this.beliefs
+                    )
+                };
+                const fallbackPlan = planFor(fallbackIntention, this.beliefs);
+                if (fallbackPlan && fallbackPlan.length > 0) {
+                    this.intentions.adoptIntention(fallbackIntention);
+                    this.currentPlan = fallbackPlan;
+                    return this.executePlan();
+                }
+    
+                console.warn("No plan found for any desire including fallback.");
             }
-            const {intention, plan} = res;
-            this.intentions.adoptIntention(intention);
-            this.currentPlan = plan;
-            this.executePlan();
+        } finally {
+            this.isDeliberating = false;
         }
     }
-    
 
-    private async executePlan() {
+    private async executePlan(): Promise<void> {
         if (this.isPlanRunning) {
-            console.log("Plan already running, aborting new execution.");
-            return; // Prevent starting a new plan if one is already running
+            console.log("Execution already in progress.");
+            return;
         }
 
-        console.log("Executing plan", this.currentPlan);
-        this.isPlanRunning = true; // Mark the plan as running
-        this.planAbortSignal = false; // Reset abort signal
+        this.isPlanRunning = true;
+        this.planAbortSignal = false;
 
         while (this.currentPlan.length > 0 && !this.planAbortSignal) {
-            const step = this.currentPlan.shift() as atomicActions;
-            const correctClientAction = this.atomicActionToApi.get(step);
+            const action = this.currentPlan.shift()!;
+            const actionFn = this.atomicActionToApi.get(action);
 
-            if (!correctClientAction) continue;
+            if (!actionFn) {
+                console.warn("No API mapping for action:", action);
+                continue;
+            }
 
-            const res = await correctClientAction(this.api);
-            if (!res) {
-                console.log("Failed ", step);
-                this.stopCurrentPlan(); // Stop the plan if it fails
+            try {
+                const res = await actionFn(this.api);
+                if (!res) throw new Error("Action failed");
+            } catch (err) {
+                console.warn(`Action ${action} failed, replanning...`);
+                this.stopCurrentPlan();
+
+                const currentIntention = this.intentions.getCurrentIntention();
+                if (currentIntention) {
+                    const newPlan = planFor(currentIntention, this.beliefs);
+                    if (newPlan && newPlan.length > 0) {
+                        this.currentPlan = newPlan;
+                        console.log("Replanned successfully.");
+                        return this.executePlan(); // recursive retry
+                    }
+                }
+
                 break;
-            } else {
-                //console.log("Success ", step, "\ndata: ", res);
             }
         }
 
+        this.isPlanRunning = false;
         if (!this.planAbortSignal) {
-            console.log("Plan completed successfully.");
+            console.log("Plan execution completed.");
         }
-        this.isPlanRunning = false; // Mark the plan as completed
     }
 
     private stopCurrentPlan() {
         console.log("Stopping current plan.");
-        this.planAbortSignal = true; // Set the abort signal to stop execution
-        this.isPlanRunning = false; // Reset the running state
-        this.currentPlan = []; // Optionally, clear the current plan
+        this.planAbortSignal = true;
+        this.isPlanRunning = false;
+        this.currentPlan = [];
     }
 }
