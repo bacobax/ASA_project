@@ -1,4 +1,4 @@
-import { Intention, atomicActions, Position, MapConfig, MapTile, Agent } from "../types/types";
+import { Intention, atomicActions, Position, MapConfig, MapTile, Agent, desireType } from "../types/types";
 import { BeliefBase } from "./beliefs";
 import { getOptimalPath, getDeliverySpot } from "./utils";
 
@@ -12,7 +12,7 @@ export class PlanLibrary {
         let actions: atomicActions[] | null = [];
         
         switch (intention.type) {
-            case "pickup":
+            case desireType.PICKUP:
                 if (intention.position && (intention.position.x !== curPos.x || intention.position.y !== curPos.y)) {
                         actions = getOptimalPath(
                             curPos, 
@@ -28,7 +28,7 @@ export class PlanLibrary {
                         }
                 }
                 break;
-            case "deliver":
+            case desireType.DELIVER:
                 const deliveryPos = getDeliverySpot(curPos, 0, beliefs);
 
                 actions = getOptimalPath(
@@ -44,7 +44,7 @@ export class PlanLibrary {
                     actions.push(atomicActions.drop);
                 }
                 break;
-            case "move":
+            case desireType.MOVE:
                 if (intention.position && (intention.position.x !== curPos.x || intention.position.y !== curPos.y)) {
                     actions = getOptimalPath(
                         curPos, 
