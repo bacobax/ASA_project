@@ -1,8 +1,8 @@
 import { BeliefBase } from "./beliefs";
 import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } from "../types/types";
 import { getCenterDirectionTilePosition, timeForPath } from "./utils/desireUtils";
-import {  getNearestParcel, getNearestDeliverySpot } from "./utils/desireUtils";
-import { DECAY_INTERVAL, EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
+
+import { EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 import { getOptimalPath } from "./utils/pathfinding";
 import { planMultiPickupStrategy } from "./utils/planUtils";
 
@@ -72,7 +72,7 @@ export class DesireGenerator {
 
         if (carryingParcels.length > 0) {
             // Try to pick up more if possible
-            const pickup = this.considerAdditionalPickup(parcels, beliefs, carryingParcels);
+            const pickup = this.considerAdditionalPickup( beliefs, carryingParcels);
             if (pickup) desires.push(pickup)
             desires.push({ type: desireType.DELIVER });
 
@@ -104,7 +104,6 @@ export class DesireGenerator {
 
 
     private considerAdditionalPickup(
-        parcels: Parcel[] | undefined,
         beliefs: BeliefBase,
         carryingParcels: Parcel[]
     ): Intention | null {
@@ -123,50 +122,5 @@ export class DesireGenerator {
     
         return null;
     }
-   
-    /**
-     * Calculates rewards for different delivery strategies
-     */
-    private calculateRewards({ optionalParcel, carryingParcels, timeForSecondaryPath, beliefs }: RewardCalculationParams) {
-        const { reward } = optionalParcel;
-        const totalRewardAtDeliverySecondaryPath = [
-            ...carryingParcels.map(p => p.reward * Math.exp(-timeForSecondaryPath/DECAY_INTERVAL)),
-            reward * Math.exp(-timeForSecondaryPath/DECAY_INTERVAL)
-        ].reduce((acc, cur) => acc + cur, 0);
-
-        const deliverySpotResult = getNearestDeliverySpot({
-            startPosition: beliefs.getBelief("position") as Position,
-            beliefs
-        });
-
-        if (!deliverySpotResult) {
-            return { pickupAnother: totalRewardAtDeliverySecondaryPath, deliverCarrying: -Infinity };
-        }
-
-        const { time } = deliverySpotResult;
-        const totalRewardAtDeliveryPrimaryPath = carryingParcels
-            .map(p => p.reward * Math.exp(-time/DECAY_INTERVAL))
-            .reduce((acc, cur) => acc + cur, 0);
-
-        return {
-            pickupAnother: totalRewardAtDeliverySecondaryPath,
-            deliverCarrying: totalRewardAtDeliveryPrimaryPath
-        };
-    }
-
-    /**
-     * Calculates minimum expiration time for carried parcels
-     */
-    private calculateMinExpirationTime(carryingParcels: Parcel[]): number {
-        return carryingParcels.map(p => p.reward * DECAY_INTERVAL).sort((a, b) => a - b)[0];
-    }
-
-    /**
-     * Determines if additional parcel pickup is feasible
-     */
-    private canPickupAdditionalParcel(timeForSecondaryPath: number, minExpirationTimeInMS: number): boolean {
-        return timeForSecondaryPath < minExpirationTimeInMS;
-    }
-
   
 }
