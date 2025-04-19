@@ -42,10 +42,10 @@ export class AgentBDI {
         this.atomicActionToApi.set(atomicActions.pickup, api => api.pickup());
         this.atomicActionToApi.set(atomicActions.drop, api => api.putdown());
 
-        this.setupEventListeners();
+
     }
 
-    private setupEventListeners() {
+    public play() {
         this.api.onYou(data => {
             this.beliefs.updateBelief("position", { x: Math.round(data.x), y: Math.round(data.y) });
             this.beliefs.updateBelief("id", data.id);
