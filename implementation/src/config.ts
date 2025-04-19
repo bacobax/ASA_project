@@ -16,4 +16,9 @@ const config = {
     ],
 };
 
+export const EXPLORATION_STEP_TOWARDS_CENTER = 2;
+export const DECAY_INTERVAL = 1000; // -1 reward per second
+export const MOVEMENT_SPEED = 1000; // 1 tile per second
+
+
 export default config;

@@ -1,9 +1,15 @@
 import { BeliefBase } from "./beliefs";
-import { Intention } from "../types/types";
-import { PlanLibrary } from "./plans";
+import { atomicActions, desireType, Intention } from "../types/types";
+import { handlePickup, handleDeliver, handleMove } from "./plans";
 
-export class Planner {
-    planFor(intention: Intention, beliefs: BeliefBase) {
-        return PlanLibrary.getPlan(intention, beliefs);
-    }
+
+export const planFor = (intention: Intention, beliefs: BeliefBase) => {
+    const handlers: { [key in desireType]?: (intention: Intention, beliefs: BeliefBase) => atomicActions[] } = {
+        [desireType.PICKUP]: handlePickup,
+        [desireType.DELIVER]: handleDeliver,
+        [desireType.MOVE]: handleMove,
+    };
+
+    const handler = handlers[intention.type];
+    return handler ? handler(intention, beliefs) : [];
 }

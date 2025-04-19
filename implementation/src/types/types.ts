@@ -4,9 +4,10 @@ export interface Position {
 }
 
 export interface Intention {
-    type: "pickup" | "deliver" | "move";
+    type: desireType;
     parcelId?: string;
     position?: Position;
+    possilbeParcels?: Parcel[];
 }
 
 export interface MapTile {
@@ -58,4 +59,10 @@ export enum atomicActions {
     moveDown = "moveDown",
     pickup = "pickup",
     drop = "drop",
+}
+
+export enum desireType {
+    PICKUP = "pickup",
+    DELIVER = "deliver",
+    MOVE = "move",
 }
