@@ -17,8 +17,7 @@ const config = {
 };
 
 export const EXPLORATION_STEP_TOWARDS_CENTER = 2;
-export const DECAY_INTERVAL = 1000; // -1 reward per second
-export const MOVEMENT_SPEED = 1000; // 1 tile per second
-
+export const WAIT_FOR_AGENT_MOVE_ON = 1000;
+export const MAX_BLOCK_RETRIES = 3;
 
 export default config;

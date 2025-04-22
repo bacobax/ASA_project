@@ -2,8 +2,8 @@ import { Position, atomicActions, Parcel, Agent } from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { MapConfig } from "../../types/types";
 import { aStarPath, getOptimalPath } from "./pathfinding";
-import { MOVEMENT_SPEED } from "../../config";
 import { getDeliverySpot } from "./mapUtils";
+import { getConfig } from "./common";
 
 export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel: Parcel, path: atomicActions[], time: number } | null => {
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
@@ -84,5 +84,7 @@ export const getCenterDirectionTilePosition = (
 }
 
 export const timeForPath = ({ path }: { path: atomicActions[] }) => {
-    return { time: path.length * MOVEMENT_SPEED };
+    const movementSpeed = getConfig<number>("MOVEMENT_DURATION");
+    if (!movementSpeed) throw new Error("MOVEMENT_DURATION not found");
+    return { time: path.length * movementSpeed };
 }

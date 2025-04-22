@@ -5,47 +5,46 @@ import { planFor } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { floydWarshallWithPaths } from "./utils/pathfinding";
 import { getCenterDirectionTilePosition } from "./utils/desireUtils";
-
 import {
-    MapConfig,
-    Position,
-    atomicActions,
-    AgentLog,
-    Intention,
-    desireType
+    MapConfig, Position, atomicActions, AgentLog, Intention,
+    desireType, Agent
 } from "../types/types";
-import { EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
+import {
+    EXPLORATION_STEP_TOWARDS_CENTER, MAX_BLOCK_RETRIES, WAIT_FOR_AGENT_MOVE_ON
+} from "../config";
+import { sanitizeConfigs, writeConfigs } from "./utils/common";
 
 export class AgentBDI {
     private api: DeliverooApi;
     private beliefs: BeliefBase = new BeliefBase();
-    private desires: DesireGenerator;
-    
-    private intentions: IntentionManager;
+    private desires = new DesireGenerator();
+    private intentions = new IntentionManager();
     private currentPlan: atomicActions[] = [];
     private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
     private isPlanRunning = false;
     private planAbortSignal = false;
     private isDeliberating = false;
-    private readonly MAX_PLAN_ATTEMPTS = 5;
+    private blockRetryCount = 0;
 
     constructor(api: DeliverooApi) {
         this.api = api;
-        this.desires = new DesireGenerator();
-        this.intentions = new IntentionManager();
-        
+        this.initActionHandlers();
+    }
 
+    private initActionHandlers(): void {
         this.atomicActionToApi.set(atomicActions.moveRight, api => api.move("right"));
         this.atomicActionToApi.set(atomicActions.moveLeft, api => api.move("left"));
         this.atomicActionToApi.set(atomicActions.moveUp, api => api.move("up"));
         this.atomicActionToApi.set(atomicActions.moveDown, api => api.move("down"));
         this.atomicActionToApi.set(atomicActions.pickup, api => api.pickup());
         this.atomicActionToApi.set(atomicActions.drop, api => api.putdown());
-
-
+        this.atomicActionToApi.set(atomicActions.wait, async _ => {
+            await new Promise(res => setTimeout(res, 1000));
+            return true;
+        });
     }
 
-    public play() {
+    public play(): void {
         this.api.onYou(data => {
             this.beliefs.updateBelief("position", { x: Math.round(data.x), y: Math.round(data.y) });
             this.beliefs.updateBelief("id", data.id);
@@ -60,136 +59,142 @@ export class AgentBDI {
         this.api.onAgentsSensing(agents => {
             this.beliefs.updateBelief("agents", agents);
             const timestamp = Date.now();
-            for (let agent of agents) {
-                if (this.beliefs.getBelief(agent.id) === undefined) {
-                    this.beliefs.updateBelief(agent.id, [] as AgentLog[]);
-                }
-                const agentLogs: AgentLog[] = this.beliefs.getBelief(agent.id) as AgentLog[];
-                agentLogs.push({
-                    prevPosition: { x: agent.x, y: agent.y },
-                    timestamp
-                });
-                this.beliefs.updateBelief(agent.id, agentLogs);
+            for (const agent of agents) {
+                const logs: AgentLog[] = this.beliefs.getBelief(agent.id) ?? [];
+                logs.push({ prevPosition: { x: agent.x, y: agent.y }, timestamp });
+                this.beliefs.updateBelief(agent.id, logs);
             }
         });
 
-        this.api.onMap((width, height, data) => {
-            const map: MapConfig = {
-                width,
-                height,
-                tiles: data
-            };
+        this.api.onMap((width, height, tiles) => {
+            const map: MapConfig = { width, height, tiles };
             this.beliefs.updateBelief("map", map);
             const { dist, prev, paths } = floydWarshallWithPaths(map);
             this.beliefs.updateBelief("dist", dist);
             this.beliefs.updateBelief("prev", prev);
             this.beliefs.updateBelief("paths", paths);
-            this.beliefs.updateBelief("deliveries", map.tiles.filter(tile => tile.delivery === true));
+            this.beliefs.updateBelief("deliveries", tiles.filter(tile => tile.delivery));
 
-            setInterval(async () => {
-                try {
-                    await this.deliberate();
-                } catch (err) {
-                    console.error("Deliberation error:", err);
-                }
-            }, 1000);
+            setInterval(() => this.deliberate().catch(console.error), 1000);
+        });
+
+        this.api.onConfig(config => {
+            const sanitized = sanitizeConfigs(config);
+            console.log({ sanitized });
+            writeConfigs(sanitized);
         });
     }
 
     private async deliberate(): Promise<void> {
         if (this.isPlanRunning || this.isDeliberating) return;
         this.isDeliberating = true;
-    
+
         try {
             this.intentions.reviseIntentions(this.beliefs);
-    
             const currentIntention = this.intentions.getCurrentIntention();
-    
+
             if (!currentIntention || this.planAbortSignal) {
-                if (this.isPlanRunning) {
-                    this.stopCurrentPlan();
-                }
-    
-                const possibleDesires = this.desires.generateDesires(this.beliefs);
-    
-                for (const desire of possibleDesires) {
+                if (this.isPlanRunning) this.stopCurrentPlan();
+
+                for (const desire of this.desires.generateDesires(this.beliefs)) {
                     const plan = planFor(desire, this.beliefs);
-                    if (plan && plan.length > 0) {
+                    if (plan?.length) {
                         this.intentions.adoptIntention(desire);
                         this.currentPlan = plan;
                         return this.executePlan();
                     }
                 }
-    
+
+                const pos = this.beliefs.getBelief<Position>("position");
+                if (!pos) return;
                 const fallbackIntention: Intention = {
                     type: desireType.MOVE,
-                    position: getCenterDirectionTilePosition(
-                        EXPLORATION_STEP_TOWARDS_CENTER,
-                        this.beliefs.getBelief("position") as Position,
-                        this.beliefs
-                    )
+                    position: getCenterDirectionTilePosition(EXPLORATION_STEP_TOWARDS_CENTER, pos, this.beliefs)
                 };
+
                 const fallbackPlan = planFor(fallbackIntention, this.beliefs);
-                if (fallbackPlan && fallbackPlan.length > 0) {
+                if (fallbackPlan?.length) {
                     this.intentions.adoptIntention(fallbackIntention);
                     this.currentPlan = fallbackPlan;
                     return this.executePlan();
                 }
-    
-                console.warn("No plan found for any desire including fallback.");
+
+                console.warn("No viable plan found, including fallback.");
             }
         } finally {
             this.isDeliberating = false;
         }
     }
 
-    private async executePlan(): Promise<void> {
-        if (this.isPlanRunning) {
-            console.log("Execution already in progress.");
-            return;
+    private isMovingAndAgentBlocking(action: atomicActions ): boolean {
+        if(action !== atomicActions.moveDown && action!== atomicActions.moveLeft && action!== atomicActions.moveRight && action!== atomicActions.moveUp){
+            return false;
         }
+        const current = this.beliefs.getBelief<Position>("position");
+        const map = this.beliefs.getBelief<MapConfig>("map");
+        if (!current || !map) throw new Error("Missing position or map");
+        
+        const delta = {
+            [atomicActions.moveDown]: { x: 0, y: 1 },
+            [atomicActions.moveLeft]: { x: -1, y: 0 },
+            [atomicActions.moveRight]: { x: 1, y: 0 },
+            [atomicActions.moveUp]: { x: 0, y: -1 }
+        }[action];
 
+        if (!delta) return false;
+        const target = { x: current.x + delta.x, y: current.y + delta.y };
+        const agents = this.beliefs.getBelief<Agent[]>("agents") ?? [];
+        return agents.some(a => a.x === target.x && a.y === target.y);
+    }
+
+    private async executePlan(): Promise<void> {
+        if (this.isPlanRunning) return;
+    
         this.isPlanRunning = true;
         this.planAbortSignal = false;
 
-        while (this.currentPlan.length > 0 && !this.planAbortSignal) {
+        while (this.currentPlan.length && !this.planAbortSignal) {
             const action = this.currentPlan.shift()!;
-            const actionFn = this.atomicActionToApi.get(action);
-
-            if (!actionFn) {
-                console.warn("No API mapping for action:", action);
-                continue;
-            }
+            const fn = this.atomicActionToApi.get(action);
+            if (!fn) continue;
 
             try {
-                const res = await actionFn(this.api);
-                if (!res) throw new Error("Action failed");
+                const res = await fn(this.api);
+                if (!res && this.isMovingAndAgentBlocking(action)) {
+                    if (++this.blockRetryCount >= MAX_BLOCK_RETRIES) {
+                        console.log("Max block retries reached, stopping plan.");
+                        this.blockRetryCount = 0;
+                        throw new Error("Max block retries reached");
+                    }
+                    console.log("Agent blocking, waiting...");
+                    await new Promise(r => setTimeout(r, WAIT_FOR_AGENT_MOVE_ON));
+                    this.currentPlan.unshift(action);
+                } else if (!res) {
+                    this.blockRetryCount = 0;
+                    throw new Error("Action failed");
+                } else {
+                    this.blockRetryCount = 0;
+                }
             } catch (err) {
-                console.warn(`Action ${action} failed, replanning...`);
                 this.stopCurrentPlan();
-
-                const currentIntention = this.intentions.getCurrentIntention();
-                if (currentIntention) {
-                    const newPlan = planFor(currentIntention, this.beliefs);
-                    if (newPlan && newPlan.length > 0) {
+                const intention = this.intentions.getCurrentIntention();
+                if (intention) {
+                    const newPlan = planFor(intention, this.beliefs);
+                    if (newPlan?.length) {
                         this.currentPlan = newPlan;
-                        console.log("Replanned successfully.");
-                        return this.executePlan(); // recursive retry
+                        return this.executePlan();
                     }
                 }
-
                 break;
             }
         }
 
         this.isPlanRunning = false;
-        if (!this.planAbortSignal) {
-            console.log("Plan execution completed.");
-        }
+        if (!this.planAbortSignal) console.log("Plan execution completed.");
     }
 
-    private stopCurrentPlan() {
-        console.log("Stopping current plan.");
+    private stopCurrentPlan(): void {
+        console.log("Stopping plan.");
         this.planAbortSignal = true;
         this.isPlanRunning = false;
         this.currentPlan = [];

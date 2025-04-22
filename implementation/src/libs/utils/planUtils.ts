@@ -1,12 +1,13 @@
-import { MapConfig, Parcel,Position, atomicActions } from "../../types/types";
+import { MapConfig, Parcel,Position, ServerConfig, atomicActions } from "../../types/types";
 import { getOptimalPath } from "../utils/pathfinding";
 import { getNearestDeliverySpot } from "../utils/desireUtils";
 import { BeliefBase } from "../beliefs";
 
-import { DECAY_INTERVAL } from "../../config";
+
 
 
 import { timeForPath } from "../utils/desireUtils";
+import { getConfig } from "./common";
 
 export interface ParcelPlanStep {
     parcel: Parcel;
@@ -49,6 +50,11 @@ export function planMultiPickupStrategy(
 ): { plan: ParcelPlanStep[]; score: number } | null {
     const currentPos = beliefs.getBelief<Position>("position")!;
     const map = beliefs.getBelief<MapConfig>("map");
+    const decayInterval = getConfig<number>("PARCEL_DECADING_INTERVAL");
+    
+    if(!decayInterval) throw new Error("PARCEL_DECADING_INTERVAL not found");
+
+
     if (!map) return null;
 
     let bestPlan: ParcelPlanStep[] = [];
@@ -66,7 +72,7 @@ export function planMultiPickupStrategy(
             { parcel: parcel1, action: "pickup", path: pathTo1 },
             { parcel: parcel1, action: "deliver", path: delivery1.path },
         ];
-        const score1 = evaluateParcelComboPlan(plan1, DECAY_INTERVAL);
+        const score1 = evaluateParcelComboPlan(plan1, decayInterval);
         if (score1.score > bestScore) {
             bestPlan = plan1;
             bestScore = score1.score;
@@ -93,7 +99,7 @@ export function planMultiPickupStrategy(
                 { parcel: parcel2, action: "deliver", path: delivery2.path },
             ];
 
-            const score2 = evaluateParcelComboPlan(plan2, DECAY_INTERVAL);
+            const score2 = evaluateParcelComboPlan(plan2, decayInterval);
             if (score2.score > bestScore) {
                 bestPlan = plan2;
                 bestScore = score2.score;
@@ -103,3 +109,4 @@ export function planMultiPickupStrategy(
 
     return bestPlan.length > 0 ? { plan: bestPlan, score: bestScore } : null;
 }
+
