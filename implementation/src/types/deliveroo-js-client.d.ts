@@ -17,7 +17,7 @@ declare module '@unitn-asa/deliveroo-js-client' {
         onParcelsSensing(callback: (parcels: Parcel[]) => void): void;
         onMsg(callback: (id: string, name: string, msg: string, replyAcknowledgmentCallback: (response: string) => void) => void): void;
         // onLog(callback: (log: LogMessage, ...message: any[]) => void): void;
-        // onConfig(callback: (config: any) => void): void;
+        onConfig(callback: (config: any) => void): void;
 
         // timer(ms: number): Promise<void>;
         move(direction: "up" | "right" | "left" | "down"): Promise<{ x: number; y: number } | false>;

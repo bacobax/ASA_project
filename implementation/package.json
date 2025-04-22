@@ -4,7 +4,7 @@
   "main": "node/index.js",
   "scripts": {
     "build": "tsc --build",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js $npm_config_num_agents"
   },
   "author": "",
   "license": "ISC",
@@ -16,7 +16,7 @@
     "socket.io-client": "^4.6.0"
   },
   "devDependencies": {
-    "@types/node": "^22.13.10",
+    "@types/node": "^22.14.1",
     "dotenv": "^16.0.3",
     "ts-node": "^10.9.2"
   }
