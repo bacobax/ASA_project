@@ -87,6 +87,7 @@ export class AgentBDI {
 
     private async deliberate(): Promise<void> {
         if (this.isPlanRunning || this.isDeliberating) return;
+
         this.isDeliberating = true;
 
         try {
@@ -94,8 +95,9 @@ export class AgentBDI {
             const currentIntention = this.intentions.getCurrentIntention();
 
             if (!currentIntention || this.planAbortSignal) {
-                if (this.isPlanRunning) this.stopCurrentPlan();
-
+                if (this.isPlanRunning) {
+                    this.stopCurrentPlan();
+                }
                 for (const desire of this.desires.generateDesires(this.beliefs)) {
                     const plan = planFor(desire, this.beliefs);
                     if (plan?.length) {
@@ -103,20 +105,6 @@ export class AgentBDI {
                         this.currentPlan = plan;
                         return this.executePlan();
                     }
-                }
-
-                const pos = this.beliefs.getBelief<Position>("position");
-                if (!pos) return;
-                const fallbackIntention: Intention = {
-                    type: desireType.MOVE,
-                    position: getCenterDirectionTilePosition(EXPLORATION_STEP_TOWARDS_CENTER, pos, this.beliefs)
-                };
-
-                const fallbackPlan = planFor(fallbackIntention, this.beliefs);
-                if (fallbackPlan?.length) {
-                    this.intentions.adoptIntention(fallbackIntention);
-                    this.currentPlan = fallbackPlan;
-                    return this.executePlan();
                 }
 
                 console.warn("No viable plan found, including fallback.");
@@ -141,7 +129,6 @@ export class AgentBDI {
             [atomicActions.moveUp]: { x: 0, y: -1 }
         }[action];
 
-        if (!delta) return false;
         const target = { x: current.x + delta.x, y: current.y + delta.y };
         const agents = this.beliefs.getBelief<Agent[]>("agents") ?? [];
         return agents.some(a => a.x === target.x && a.y === target.y);

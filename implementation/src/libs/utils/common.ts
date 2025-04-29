@@ -112,7 +112,6 @@ export const getConfig = <T>(key: string): T|undefined|null => {
         return cached as T;
     }
 
-
     const configPath = path.join(__dirname, '../store/serverConfigs.json');
     const rawConfigs = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     
