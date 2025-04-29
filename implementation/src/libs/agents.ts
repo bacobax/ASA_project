@@ -13,7 +13,7 @@ import {
 import {
     EXPLORATION_STEP_TOWARDS_CENTER, MAX_BLOCK_RETRIES, WAIT_FOR_AGENT_MOVE_ON
 } from "../config";
-import { sanitizeConfigs, writeConfigs } from "./utils/common";
+import { sanitizeConfigs, Strategies, writeConfigs } from "./utils/common";
 import path from "path";
 
 export class AgentBDI {
@@ -28,8 +28,10 @@ export class AgentBDI {
     private isDeliberating = false;
     private blockRetryCount = 0;
 
-    constructor(api: DeliverooApi) {
+    constructor(api: DeliverooApi, strategy: Strategies) {
         this.api = api;
+        this.beliefs.updateBelief("strategy", strategy);
+        console.log(`Strategy: ${strategy}`)
         this.initActionHandlers();
     }
 

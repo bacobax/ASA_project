@@ -1,25 +1,17 @@
 import { BeliefBase } from "./beliefs";
 import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } from "../types/types";
-import { getCenterDirectionTilePosition, timeForPath } from "./utils/desireUtils";
+import { getCenterDirectionTilePosition,  getNearestDeliverySpot } from "./utils/desireUtils";
+import {  EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
+import { getConfig, Strategies } from "./utils/common";
+import { getMinDistance } from "./utils/mapUtils";
+import { rewardNormalizations } from "./utils/planUtils";
 
-import { EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
-import { getOptimalPath } from "./utils/pathfinding";
-import { planMultiPickupStrategy } from "./utils/planUtils";
 
-/**
- * Interface for reward calculation parameters
- */
-interface RewardCalculationParams {
-    optionalParcel: Parcel;
-    carryingParcels: Parcel[];
-    timeForSecondaryPath: number;
-    beliefs: BeliefBase;
-}
 
 export interface ReachableParcel {
     parcel: Parcel;
-    path: atomicActions[];
     time: number;
+    distance: number;
 }
 
 interface ReachableParcelArgs {
@@ -27,27 +19,65 @@ interface ReachableParcelArgs {
     filter?: (parcel: Parcel) => boolean;
 }
 
-export const getReachableParcels = ({ beliefs, filter }: ReachableParcelArgs): Parcel[] => {
+export const getReachableParcels = ({ beliefs, filter }: ReachableParcelArgs): ReachableParcel[] => {
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
     const curPos = beliefs.getBelief<Position>("position");
     const map = beliefs.getBelief<MapConfig>("map");
+    const speed = getConfig<number>("MOVEMENT_DURATION");
 
-    if (!parcels || !curPos || !map) throw new Error("Missing beliefs");
+
+    if (!parcels || !curPos || !map || !speed) throw new Error("Missing beliefs");
 
     const uncarried = parcels.filter(p => !p.carriedBy && (!filter || filter(p)));
 
-    const reachable: Parcel[] = [];
+    const reachable: ReachableParcel[] = [];
 
     for (const parcel of uncarried) {
-        const path = getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, map, beliefs);
-        if (!path) continue;
+        const distance = getMinDistance({
+            startPosition: curPos,
+            endPosition: { x: parcel.x, y: parcel.y },
+            beliefs,
+        });
 
-        const time = timeForPath({ path }).time;
-        reachable.push(parcel);
+        const time = distance * speed;
+        reachable.push({ parcel, time, distance });
     }
 
     return reachable;
 };
+
+
+
+const gainFromReachableParcel =(
+        baseReward: number, 
+        baseDistance:number, 
+        beliefs: BeliefBase, 
+        MOVEMENT_DURATION: number, 
+        DECAY_INTERVAL: number, 
+        carryingParcels: Parcel[]) => ({ parcel, time: fromMeToParcelTime , distance: fromMeToParcelDistance }: ReachableParcel) => {
+                const delivery = getNearestDeliverySpot({
+                    startPosition: { x: parcel.x, y: parcel.y },
+                    beliefs
+                });
+
+                const deliverytime = delivery.distance * MOVEMENT_DURATION
+                const totalTime = fromMeToParcelTime + deliverytime;
+                const totalDistance = fromMeToParcelDistance + delivery.distance;
+
+                const totalReward = [
+                    ...carryingParcels.map(p => Math.max(0, p.reward - Math.floor(totalTime / DECAY_INTERVAL))),
+                    Math.max(0, baseReward - Math.floor(totalTime / DECAY_INTERVAL))
+                ].reduce((a, b) => a + b, 0);
+                
+                console.log("Parcel:", parcel.id,"Reward:", parcel.reward, "Total Reward:", totalReward, "fromMeToParcelTime:", fromMeToParcelTime, "deliveryTime:", deliverytime, "totalTime:", totalTime);
+
+                const strategy = beliefs.getBelief<Strategies>("strategy")!;
+                const normalizedTotalReward = rewardNormalizations[strategy](totalReward, totalDistance);
+                const normalizedBaseReward = rewardNormalizations[strategy](baseReward, baseDistance);
+
+                return normalizedTotalReward - normalizedBaseReward;
+            }
+
 /**
  * DesireGenerator class handles the generation of desires (intentions) based on the agent's beliefs
  * and current state. It implements a reward-based decision-making system for parcel delivery.
@@ -72,8 +102,8 @@ export class DesireGenerator {
 
         if (carryingParcels.length > 0) {
             // Try to pick up more if possible
-            const pickup = this.considerAdditionalPickup( beliefs, carryingParcels);
-            if (pickup) desires.push(pickup)
+            const additionalPickup = this.considerAdditionalPickup(parcels, beliefs, carryingParcels);
+            if (additionalPickup) desires.push(additionalPickup)
             desires.push({ type: desireType.DELIVER });
 
             // Deliver what you're carrying
@@ -104,23 +134,69 @@ export class DesireGenerator {
 
 
     private considerAdditionalPickup(
+        parcels: Parcel[] | undefined,
         beliefs: BeliefBase,
         carryingParcels: Parcel[]
     ): Intention | null {
         const reachableParcels = getReachableParcels({ beliefs });
+        const DECAY_INTERVAL = getConfig<number>("PARCEL_DECADING_INTERVAL");
+        const MOVEMENT_DURATION = getConfig<number>("MOVEMENT_DURATION");
+
+        if (!DECAY_INTERVAL || ! MOVEMENT_DURATION) return null;
+
         if (reachableParcels.length === 0) return null;
-    
-        const result = planMultiPickupStrategy(beliefs, carryingParcels, reachableParcels);
-        if (!result) return null;
-    
-        if (result.plan.some(step => step.action === "pickup")) {
-            return {
-                type: desireType.PICKUP,
-                possilbeParcels: result.plan.filter(p => p.action === "pickup").map(p => p.parcel),
-            };
+
+        const deliverySpot = getNearestDeliverySpot({
+            startPosition: beliefs.getBelief("position") as Position,
+            beliefs,
+        });
+
+
+
+        const baseDeliveryTime = deliverySpot.distance * MOVEMENT_DURATION;
+        const baseDistance = deliverySpot.distance; // Assuming this is the distance from the current position to the delivery spo
+
+        const baseReward = carryingParcels.reduce(
+            (acc, p) => acc + Math.max(0, p.reward - Math.floor(baseDeliveryTime / DECAY_INTERVAL)),
+            0
+        );
+
+        let bestParcel: Parcel | null = null;
+        let bestGain = -Infinity;
+        console.log("Base reward:", baseReward);
+
+        const gainFunction = gainFromReachableParcel(
+            baseReward,
+            baseDistance,
+            beliefs,
+            MOVEMENT_DURATION,
+            DECAY_INTERVAL,
+            carryingParcels
+        )
+
+        for (const reachableParcel of reachableParcels) {
+           
+            const gain = gainFunction(reachableParcel);
+
+            if (gain > 0 && gain > bestGain) {
+                bestGain = gain;
+                bestParcel = reachableParcel.parcel;
+            }
+           
         }
-    
-        return null;
+        const possileParcels = reachableParcels.filter(RP => gainFunction(RP)>0).map(RP => RP.parcel);
+        
+        return bestParcel
+            ? {
+                type: desireType.PICKUP,
+                possilbeParcels: possileParcels,
+            }
+            : null;
     }
+    
+    
+
+    
+
   
 }

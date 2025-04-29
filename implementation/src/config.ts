@@ -20,4 +20,12 @@ export const EXPLORATION_STEP_TOWARDS_CENTER = 2;
 export const WAIT_FOR_AGENT_MOVE_ON = 1000;
 export const MAX_BLOCK_RETRIES = 3;
 
+export const DISTANCE_WEIGHT = 1.5;
+export const REWARD_WEIGHT = 1;
+
+export const AGGRESSIVE_DISTANCE_WEIGHT = 1.17; // should be 1.1 < x < 1.3
+
+export const S_REWARD_WEIGHT = 0.7;
+export const S_DISTANCE_WEIGHT = 0.5;
+
 export default config;

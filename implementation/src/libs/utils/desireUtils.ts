@@ -2,7 +2,7 @@ import { Position, atomicActions, Parcel, Agent } from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { MapConfig } from "../../types/types";
 import { aStarPath, getOptimalPath } from "./pathfinding";
-import { getDeliverySpot } from "./mapUtils";
+import { getDeliverySpot, getMinDistance } from "./mapUtils";
 import { getConfig } from "./common";
 
 export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel: Parcel, path: atomicActions[], time: number } | null => {
@@ -46,13 +46,9 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
     return { parcel: minParcel, path: minPath, time: timeForPath({ path: minPath }).time };
 }
 
-export const getNearestDeliverySpot = ({ startPosition, beliefs }: { startPosition: Position, beliefs: BeliefBase }) => {
-    const deliveryPosition = getDeliverySpot(startPosition, 1, beliefs);
-    const path = getOptimalPath(startPosition, deliveryPosition, beliefs.getBelief("map") as MapConfig, beliefs);
-    if (path == null) return null;
-    const { time } = timeForPath({ path });
-    return { deliveryPosition, path, time };
-}
+export const getNearestDeliverySpot = ({ startPosition, beliefs }: { startPosition: Position, beliefs: BeliefBase}) =>  getDeliverySpot(startPosition, 0, beliefs);
+
+
 
 export const getCenterDirectionTilePosition = (
     nStep: number,

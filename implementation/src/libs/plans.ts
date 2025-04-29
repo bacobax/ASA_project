@@ -1,5 +1,6 @@
 import { Intention, atomicActions, Position, MapConfig, desireType } from "../types/types";
 import { BeliefBase } from "./beliefs";
+import { Strategies } from "./utils/common";
 import { getDeliverySpot } from "./utils/mapUtils";
 import { getOptimalPath } from "./utils/pathfinding";
 import { parcelsCompare } from "./utils/planUtils";
@@ -7,7 +8,8 @@ import { parcelsCompare } from "./utils/planUtils";
 export function handlePickup(intention: Intention, beliefs: BeliefBase): atomicActions[] {
     const curPos = beliefs.getBelief<Position>("position")!;
     const map = beliefs.getBelief<MapConfig>("map")!;
-
+    const strategy = beliefs.getBelief<Strategies>("strategy")!;
+    
     if (!intention.possilbeParcels || intention.possilbeParcels.length === 0) {
         console.error("No parcels available for pickup");
         return [];
@@ -22,7 +24,7 @@ export function handlePickup(intention: Intention, beliefs: BeliefBase): atomicA
                 path: path ?? null,
             };
         })
-        .sort(parcelsCompare);
+        .sort(parcelsCompare(strategy));
 
     const bestPath = sorted[0]?.path;
     if (!bestPath) {

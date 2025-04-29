@@ -121,3 +121,10 @@ export const getConfig = <T>(key: string): T|undefined|null => {
     return value;
     
 }
+
+
+export enum Strategies{
+    linear = "linear",
+    aggressive = "aggressive",
+    sophisticated = "sophisticated",
+}
