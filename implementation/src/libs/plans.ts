@@ -39,7 +39,7 @@ export function handleDeliver(intention: Intention, beliefs: BeliefBase): atomic
     const map = beliefs.getBelief<MapConfig>("map")!;
     const deliveryPos = getDeliverySpot(curPos, 0, beliefs);
 
-    const path = getOptimalPath(curPos, deliveryPos, map, beliefs);
+    const path = getOptimalPath(curPos, deliveryPos.position, map, beliefs);
     if (!path) {
         console.error("Error in pathfinding");
         return [];
