@@ -170,11 +170,37 @@ function reconstructPath(cameFrom: Map<string, MapTile>, current: MapTile): MapT
     return path;
 }
 
+export function getVisitedTilesFromPath(startPos: Position, path: atomicActions[]): Position[] {
+    const visitedTiles: Position[] = [];
+    let currentPos: Position = { x: startPos.x, y: startPos.y };
+    for (const action of path) {
+        switch (action) {
+            case atomicActions.moveUp:
+                currentPos = { x: currentPos.x, y: currentPos.y - 1 };
+                break;
+            case atomicActions.moveDown:
+                currentPos = { x: currentPos.x, y: currentPos.y + 1 };
+                break;
+            case atomicActions.moveLeft:
+                currentPos = { x: currentPos.x - 1, y: currentPos.y };
+                break;
+            case atomicActions.moveRight:
+                currentPos = { x: currentPos.x + 1, y: currentPos.y };
+                break;
+
+            default:
+                break;
+        }
+        visitedTiles.push({ ...currentPos });
+    }
+    return visitedTiles;
+}
+
 export function getOptimalPath(
     startPos: Position,
     endPos: Position,
     mapConfig: MapConfig,
-    beliefs: BeliefBase
+    beliefs: BeliefBase,
 ): atomicActions[] | null {
     if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
@@ -184,6 +210,7 @@ export function getOptimalPath(
         .map(agent => ({ x: agent.x, y: agent.y }));
 
     try {
+        
         const path = aStarPath(startPos, endPos, mapConfig, obstacles);
         return convertPathToActions(path);
     } catch (error) {
