@@ -119,21 +119,6 @@ function manhattanDistance(posA: Position, posB: Position): number {
     return Math.abs(posA.x - posB.x) + Math.abs(posA.y - posB.y);
 }
 
-function heuristic(a: MapTile, b: MapTile, agentsSet: Position[]): number {
-    const posA: Position = {x: a.x, y: a.y};
-    const posB: Position = {x: b.x, y: b.y};
-    let val = 0;
-    for(const agent of agentsSet) {
-        switch(manhattanDistance(posA, agent)){
-            case 1:
-                val+= 5;
-            case 2:
-                val+= 2;
-        }
-    }
-    return val + manhattanDistance(posA, posB);
-}
-
 function getNeighbors(
     tile: MapTile,
     validTiles: Map<string, MapTile>,
@@ -176,10 +161,10 @@ function reconstructPath(cameFrom: Map<string, MapTile>, current: MapTile): MapT
     return path;
 }
 
-export function getVisitedTilesFromPath(startPos: Position, path: atomicActions[]): Position[] {
-    const visitedTiles: Position[] = [];
+export function getVisitedTilesFromPlan(startPos: Position, plan: atomicActions[], mapConfig: MapConfig): MapTile[] {
+    const visitedTiles: MapTile[] = [];
     let currentPos: Position = { x: startPos.x, y: startPos.y };
-    for (const action of path) {
+    for (const action of plan) {
         switch (action) {
             case atomicActions.moveUp:
                 currentPos = { x: currentPos.x, y: currentPos.y - 1 };
@@ -197,7 +182,7 @@ export function getVisitedTilesFromPath(startPos: Position, path: atomicActions[
             default:
                 break;
         }
-        visitedTiles.push({ ...currentPos });
+        visitedTiles.push(mapConfig.tiles.find(tile => tile.x === currentPos.x && tile.y === currentPos.y)!);
     }
     return visitedTiles;
 }

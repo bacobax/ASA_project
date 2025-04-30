@@ -1,18 +1,18 @@
-import { Intention, atomicActions, Position, MapConfig, desireType } from "../types/types";
+import { Intention, atomicActions, Position, MapConfig, desireType, Parcel } from "../types/types";
 import { BeliefBase } from "./beliefs";
 import { Strategies } from "./utils/common";
 import { getDeliverySpot } from "./utils/mapUtils";
-import { getOptimalPath } from "./utils/pathfinding";
+import { getOptimalPath, getVisitedTilesFromPlan } from "./utils/pathfinding";
 import { parcelsCompare } from "./utils/planUtils";
 
-export function handlePickup(intention: Intention, beliefs: BeliefBase): atomicActions[] {
+export function handlePickup(intention: Intention, beliefs: BeliefBase): {intention: Intention, path: atomicActions[]} {
     const curPos = beliefs.getBelief<Position>("position")!;
     const map = beliefs.getBelief<MapConfig>("map")!;
     const strategy = beliefs.getBelief<Strategies>("strategy")!;
-    
+
     if (!intention.possilbeParcels || intention.possilbeParcels.length === 0) {
         console.error("No parcels available for pickup");
-        return [];
+        return {path:[], intention: intention};
     }
 
     const sorted = intention.possilbeParcels
@@ -26,17 +26,43 @@ export function handlePickup(intention: Intention, beliefs: BeliefBase): atomicA
         })
         .sort(parcelsCompare(strategy));
 
-    const bestPath = sorted[0]?.path;
-    if (!bestPath) {
+    const bestPlan = sorted[0]?.path;
+    if (!bestPlan) {
         console.error("Error in pathfinding");
-        return [];
+        return {path:[], intention: intention};
     }
 
-    bestPath.push(atomicActions.pickup);
-    return bestPath;
+
+    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+    const carryingParcels = parcels?.filter(p => p.carriedBy === beliefs.getBelief<string>("id")) ?? [];
+
+    if (carryingParcels.length > 0) {
+        const currentPos = beliefs.getBelief<Position>("position");
+        if (currentPos) {
+            const tilesToVisit = getVisitedTilesFromPlan(currentPos, bestPlan, beliefs.getBelief<MapConfig>("map")!);
+            for(let i = 0; i < tilesToVisit.length; i++){
+                const tile = tilesToVisit[i];
+                if(tile.delivery){
+                    const path = bestPlan.slice(0, i);
+                    path.push(atomicActions.drop);
+                    const intention = {
+                        type: desireType.DELIVER,
+                        position: {x: tile.x, y: tile.y}
+                    }
+
+                    return {path:path, intention:intention}
+                }
+            }
+        }
+        
+    }
+        
+
+    bestPlan.push(atomicActions.pickup);
+    return {path:bestPlan, intention: intention};
 }
 
-export function handleDeliver(intention: Intention, beliefs: BeliefBase): atomicActions[] {
+export function handleDeliver(intention: Intention, beliefs: BeliefBase): {intention: Intention, path: atomicActions[]} {
     const curPos = beliefs.getBelief<Position>("position")!;
     const map = beliefs.getBelief<MapConfig>("map")!;
     const deliveryPos = getDeliverySpot(curPos, 0, beliefs);
@@ -44,14 +70,14 @@ export function handleDeliver(intention: Intention, beliefs: BeliefBase): atomic
     const path = getOptimalPath(curPos, deliveryPos.position, map, beliefs);
     if (!path) {
         console.error("Error in pathfinding");
-        return [];
+        return {path:[], intention: intention};
     }
 
     path.push(atomicActions.drop);
-    return path;
+    return {path:path, intention: intention};
 }
 
-export function handleMove(intention: Intention, beliefs: BeliefBase): atomicActions[] {
+export function handleMove(intention: Intention, beliefs: BeliefBase): {intention: Intention, path: atomicActions[]} {
     const curPos = beliefs.getBelief<Position>("position")!;
     const map = beliefs.getBelief<MapConfig>("map")!;
 
@@ -62,11 +88,11 @@ export function handleMove(intention: Intention, beliefs: BeliefBase): atomicAct
         const path = getOptimalPath(curPos, intention.position, map, beliefs);
         if (!path) {
             console.error("Error in pathfinding");
-            return [];
+            return {path:[], intention: intention};
         }
-        return path;
+        return {path:path, intention: intention};
     }
 
-    return [];
+    return {path:[], intention: intention};
 }
 
