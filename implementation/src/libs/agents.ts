@@ -3,7 +3,7 @@ import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
 import { planFor } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
-import { floydWarshallWithPaths, getVisitedTilesFromPath as getVisitedTilesFromPlan } from "./utils/pathfinding";
+import { floydWarshallWithPaths } from "./utils/pathfinding";
 import { getCenterDirectionTilePosition } from "./utils/desireUtils";
 import {
     MapConfig, Position, atomicActions, AgentLog, Intention,
@@ -14,7 +14,6 @@ import {
     EXPLORATION_STEP_TOWARDS_CENTER, MAX_BLOCK_RETRIES, WAIT_FOR_AGENT_MOVE_ON
 } from "../config";
 import { sanitizeConfigs, Strategies, writeConfigs } from "./utils/common";
-import path from "path";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -119,28 +118,9 @@ export class AgentBDI {
                     this.stopCurrentPlan();
                 }
                 for (const desire of this.desires.generateDesires(this.beliefs)) {
-                    console.log({me: this.beliefs.getBelief("position")})
-                    const plan = planFor(desire, this.beliefs);
-                    if (plan?.length) {
-                        // if(desire.type === desireType.PICKUP){
-                        //     const parcels = this.beliefs.getBelief<Parcel[]>("visibleParcels");
-                        //     const carryingParcels = parcels?.filter(p => p.carriedBy === this.beliefs.getBelief<string>("id")) ?? [];
-
-                        //     if (carryingParcels.length > 0) {
-                        //         const currentPos = this.beliefs.getBelief<Position>("position");
-                        //         if (currentPos) {
-                        //             const tilesToVisit = getVisitedTilesFromPlan(currentPos, plan);
-                        //             for(const tile of tilesToVisit){
-                        //                 if(tile.delivery){
-                                            
-                        //                 }
-                        //             }
-                        //         }
-                                
-                        //     }
-                            
-                        // }
-                        this.intentions.adoptIntention(desire);
+                    const { path: plan = [], intention = null } = planFor(desire, this.beliefs) ?? {};
+                    if (plan?.length && intention) {
+                        this.intentions.adoptIntention(intention);
                         this.currentPlan = plan;
                         return this.executePlan();
                     }
@@ -209,9 +189,10 @@ export class AgentBDI {
                 this.stopCurrentPlan();
                 const intention = this.intentions.getCurrentIntention();
                 if (intention) {
-                    const newPlan = planFor(intention, this.beliefs);
-                    if (newPlan?.length) {
-                        this.currentPlan = newPlan;
+                    const res = planFor(intention, this.beliefs);
+                    if (res) {
+                        this.intentions.adoptIntention(res.intention);
+                        this.currentPlan = res.path;
                         return this.executePlan();
                     }
                 }
