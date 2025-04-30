@@ -13,7 +13,6 @@ export interface Intention {
 export interface MapTile {
     x: number;
     y: number;
-    delivery: boolean;
     type?: number
 }
 

@@ -42,7 +42,7 @@ export function handlePickup(intention: Intention, beliefs: BeliefBase): {intent
             const tilesToVisit = getVisitedTilesFromPlan(currentPos, bestPlan, beliefs.getBelief<MapConfig>("map")!);
             for(let i = 0; i < tilesToVisit.length; i++){
                 const tile = tilesToVisit[i];
-                if(tile.delivery){
+                if(tile.type == 2){
                     const path = bestPlan.slice(0, i);
                     path.push(atomicActions.drop);
                     const intention = {
