@@ -3,7 +3,7 @@ import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } fro
 import { getCenterDirectionTilePosition,  getNearestDeliverySpot } from "./utils/desireUtils";
 import {  EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 import { getConfig, Strategies } from "./utils/common";
-import { getMinDistance } from "./utils/mapUtils";
+import { getDeliverySpot, getMinDistance } from "./utils/mapUtils";
 import { rewardNormalizations } from "./utils/planUtils";
 
 
@@ -120,15 +120,18 @@ export class DesireGenerator {
         }
 
         // Always have a fallback desire to explore
+        // desires.push({
+        //     type: desireType.MOVE,
+        //     position: getCenterDirectionTilePosition(
+        //         EXPLORATION_STEP_TOWARDS_CENTER,
+        //         curPos,
+        //         beliefs
+        //     ),
+        // });
         desires.push({
             type: desireType.MOVE,
-            position: getCenterDirectionTilePosition(
-                EXPLORATION_STEP_TOWARDS_CENTER,
-                curPos,
-                beliefs
-            ),
+            position: getDeliverySpot(curPos, 3, beliefs).position,
         });
-
         return desires;
     }
 
