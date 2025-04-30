@@ -81,6 +81,12 @@ export const sanitizeConfigs = (configs: RawServerConfig): ServerConfig => {
                return value * 60 * 60 * 1000;
            case'm':
                return value * 60 * 1000;
+            case 'frame':
+                const clock = getConfig<number>('CLOCK');
+                if (!clock) {
+                    throw new Error('CLOCK is not defined');
+                }
+                return clock; // 60fps
            default:
                throw new Error(`Invalid time unit: ${unit}`);
        }

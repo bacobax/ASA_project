@@ -27,12 +27,18 @@ export class AgentBDI {
     private planAbortSignal = false;
     private isDeliberating = false;
     private blockRetryCount = 0;
+    private startSemaphore = {
+        onYou: false,
+        onMap: false,
+        onConfig: false,
+    }
 
     constructor(api: DeliverooApi, strategy: Strategies) {
         this.api = api;
         this.beliefs.updateBelief("strategy", strategy);
         console.log(`Strategy: ${strategy}`)
         this.initActionHandlers();
+        this.setupSocketHandlers();
     }
 
     private initActionHandlers(): void {
@@ -47,12 +53,19 @@ export class AgentBDI {
             return true;
         });
     }
-
-    public play(): void {
+    public play(): void{
+        if(!this.startSemaphore.onYou || !this.startSemaphore.onMap || !this.startSemaphore.onConfig){
+            setTimeout(() => this.play(), 1000);
+            return;
+        }
+        setInterval(() => this.deliberate().catch(console.error), 1000);
+    }
+    private setupSocketHandlers(): void {
         this.api.onYou(data => {
             this.beliefs.updateBelief("position", { x: Math.round(data.x), y: Math.round(data.y) });
             this.beliefs.updateBelief("id", data.id);
             this.beliefs.updateBelief("score", data.score);
+            this.startSemaphore.onYou = true;
         });
 
         this.api.onParcelsSensing(parcels => {
@@ -71,21 +84,24 @@ export class AgentBDI {
         });
 
         this.api.onMap((width, height, tiles) => {
-            const map: MapConfig = { width, height, tiles };
+            const validTiles = tiles.filter(t => t.type !== 0);
+            const map: MapConfig = { width, height, tiles: validTiles };
             this.beliefs.updateBelief("map", map);
             const { dist, prev, paths } = floydWarshallWithPaths(map);
             this.beliefs.updateBelief("dist", dist);
             this.beliefs.updateBelief("prev", prev);
             this.beliefs.updateBelief("paths", paths);
-            this.beliefs.updateBelief("deliveries", tiles.filter(tile => tile.delivery));
+            this.beliefs.updateBelief("deliveries", tiles.filter(tile => tile.type == 2));
 
-            setInterval(() => this.deliberate().catch(console.error), 1000);
+           
+            this.startSemaphore.onMap = true;
         });
 
         this.api.onConfig(config => {
             const sanitized = sanitizeConfigs(config);
             console.log({ sanitized });
             writeConfigs(sanitized);
+            this.startSemaphore.onConfig = true;
         });
     }
 
@@ -103,6 +119,7 @@ export class AgentBDI {
                     this.stopCurrentPlan();
                 }
                 for (const desire of this.desires.generateDesires(this.beliefs)) {
+                    console.log({me: this.beliefs.getBelief("position")})
                     const plan = planFor(desire, this.beliefs);
                     if (plan?.length) {
                         // if(desire.type === desireType.PICKUP){
@@ -161,12 +178,14 @@ export class AgentBDI {
     
         this.isPlanRunning = true;
         this.planAbortSignal = false;
+        
 
         while (this.currentPlan.length && !this.planAbortSignal) {
             const action = this.currentPlan.shift()!;
             const fn = this.atomicActionToApi.get(action);
             if (!fn) continue;
-
+            // const map = this.beliefs.getBelief<MapConfig>("map");
+            // console.log({map, currentIntention: this.intentions.getCurrentIntention()})
             try {
                 const res = await fn(this.api);
                 if (!res && this.isMovingAndAgentBlocking(action)) {
@@ -180,11 +199,13 @@ export class AgentBDI {
                     this.currentPlan.unshift(action);
                 } else if (!res) {
                     this.blockRetryCount = 0;
-                    throw new Error("Action failed");
+                    throw new Error("Action failed, action: " + action);
                 } else {
                     this.blockRetryCount = 0;
                 }
             } catch (err) {
+                console.error("Error executing plan:", err);
+                
                 this.stopCurrentPlan();
                 const intention = this.intentions.getCurrentIntention();
                 if (intention) {

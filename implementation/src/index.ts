@@ -5,9 +5,9 @@ import { playAgents, spawnAgents } from "./libs/utils/multiAgentUtils";
 import { Strategies } from "./libs/utils/common";
 
 const strategies = [
+    Strategies.sophisticated,
     Strategies.linear,
     Strategies.aggressive,
-    Strategies.sophisticated,
 ]
 // Get number of agents from command line arguments
 const numAgents = process.argv.length > 1 ? parseInt(process.argv[2]) : 3;

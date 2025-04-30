@@ -61,7 +61,10 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
 export function aStarPath(startPos: Position, endPos: Position, mapConfig: MapConfig, agents: Position[]): MapTile[] {
     const { width, height, tiles } = mapConfig;
     const validTiles = new Map<string, MapTile>();
-    tiles.forEach(tile => validTiles.set(`${tile.x},${tile.y}`, tile));
+    tiles.forEach(tile => {
+
+        validTiles.set(`${tile.x},${tile.y}`, tile)
+    });
 
     const openSet: MapTile[] = [];
     const closedSet = new Set<string>();
@@ -69,9 +72,12 @@ export function aStarPath(startPos: Position, endPos: Position, mapConfig: MapCo
     const gScore = new Map<string, number>();
     const fScore = new Map<string, number>();
 
-    const startTile = validTiles.get(`${startPos.x},${startPos.y}`);
-    const endTile = validTiles.get(`${endPos.x},${endPos.y}`);
-    if (!startTile || !endTile) throw new Error("Invalid start or end position");
+    // const startTile = validTiles.get(`${startPos.x},${startPos.y}`);
+    // const endTile = validTiles.get(`${endPos.x},${endPos.y}`);
+    const startTile = tiles.find(tile => tile.x === startPos.x && tile.y === startPos.y);
+    const endTile = tiles.find(tile => tile.x === endPos.x && tile.y === endPos.y);
+
+    if (!startTile || !endTile) throw new Error("Invalid start or end position " + startPos.x + " " + startPos.y + " " + endPos.x + " " + endPos.y);
 
     const agentsSet = new Set(agents.map(p => `${p.x},${p.y}`));
 

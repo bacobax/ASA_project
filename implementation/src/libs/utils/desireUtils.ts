@@ -62,6 +62,27 @@ export const getCenterDirectionTilePosition = (
         x: Math.floor(map.width / 2),
         y: Math.floor(map.height / 2),
     };
+    const tiles = map.tiles;
+    // Find the tile closest to the center using Manhattan distance
+    let minDistance = Infinity;
+    let closestTile = center;
+
+    for (let x = 0; x < map.width; x++) {
+        for (let y = 0; y < map.height; y++) {
+            const tile = tiles.find((t) => t.x === x && t.y === y);
+            if(!tile) continue;
+            const distance = Math.abs(x - center.x) + Math.abs(y - center.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestTile = { x, y };
+            }
+        }
+    }
+
+    center.x = closestTile.x;
+    center.y = closestTile.y;
+
+    
 
     const agents = beliefs.getBelief<Agent[]>("agents") || [];
     const obstacles = agents
