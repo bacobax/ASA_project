@@ -105,3 +105,47 @@ export const timeForPath = ({ path }: { path: atomicActions[] }) => {
     if (!movementSpeed) throw new Error("MOVEMENT_DURATION not found");
     return { time: path.length * movementSpeed };
 }
+
+function computeExplorationScores(
+    beliefs: BeliefBase,
+    maxAge: number
+  ): number[][] { 
+    const mapTypes = beliefs.getBelief<number[][]>("mapTypes")! as number[][];
+    const map = beliefs.getBelief<MapConfig>("map")! as MapConfig;
+    const visionRange = getConfig<number>("AGENTS_OBSERVATION_DISTANCE")!;
+    const lastVisited = beliefs.getBelief<number[][]>("lastVisited")! as number[][];
+    const currentTime = Date.now();
+    
+    const height = map.height;
+    const width = map.width;
+
+    const scores: number[][] = Array.from({ length: height }, () =>
+      Array(width).fill(0)
+    );
+  
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (mapTypes[y][x] === 0) continue; // wall
+  
+        let score = 0;
+        for (let dy = -visionRange; dy <= visionRange; dy++) {
+          for (let dx = -visionRange; dx <= visionRange; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (
+              nx >= 0 && ny >= 0 && ny < height && nx < width &&
+              Math.abs(dx) + Math.abs(dy) <= visionRange &&
+              mapTypes[ny][nx] === 1 && 
+              currentTime - lastVisited[ny][nx] > maxAge
+            ) {
+              score++;
+            }
+          }
+        }
+        scores[y][x] = score;
+      }
+    }
+  
+    return scores;
+  }
+  
