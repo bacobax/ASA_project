@@ -29,4 +29,6 @@ export const AGGRESSIVE_DISTANCE_WEIGHT = 1.17; // should be 1.1 < x < 1.3
 export const S_REWARD_WEIGHT = 0.7;
 export const S_DISTANCE_WEIGHT = 0.5;
 
+export const MAX_AGE_EXPLORATION = 10000;
+
 export default config;

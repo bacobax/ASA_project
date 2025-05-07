@@ -69,7 +69,7 @@ export class AgentBDI {
                 if (map){
                     let lastVisitedNew : number[][] = new Array(map.width).fill(-Infinity).map(() => new Array(map.height).fill(-Infinity));
                     lastVisitedNew[position.x][position.y] = Date.now(); 
-                    this.beliefs.updateBelief("lastVisited", lastVisited); 
+                    this.beliefs.updateBelief("lastVisited", lastVisitedNew); 
                 }
             } else {
                 lastVisited[position.x][position.y] = Date.now();

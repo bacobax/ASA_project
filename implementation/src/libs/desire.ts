@@ -1,6 +1,6 @@
 import { BeliefBase } from "./beliefs";
 import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } from "../types/types";
-import { getCenterDirectionTilePosition,  getNearestDeliverySpot } from "./utils/desireUtils";
+import { getCenterDirectionTilePosition,  getNearestDeliverySpot, selectBestExplorationTile } from "./utils/desireUtils";
 import {  EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 import { getConfig, Strategies } from "./utils/common";
 import { getMinDistance } from "./utils/mapUtils";
@@ -120,13 +120,19 @@ export class DesireGenerator {
         }
 
         // Always have a fallback desire to explore
-        desires.push({
-            type: desireType.MOVE,
-            position: getCenterDirectionTilePosition(
+
+        let tileToExplore = selectBestExplorationTile(beliefs, curPos);
+        if (!tileToExplore) {
+            tileToExplore = getCenterDirectionTilePosition(
                 EXPLORATION_STEP_TOWARDS_CENTER,
                 curPos,
                 beliefs
-            ),
+            );
+        }
+        
+        desires.push({
+            type: desireType.MOVE,
+            position: tileToExplore
         });
 
         return desires;

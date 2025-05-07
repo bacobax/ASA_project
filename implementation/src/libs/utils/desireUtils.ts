@@ -1,9 +1,10 @@
 import { Position, atomicActions, Parcel, Agent } from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { MapConfig } from "../../types/types";
-import { aStarPath, getOptimalPath } from "./pathfinding";
-import { getDeliverySpot, getMinDistance } from "./mapUtils";
+import { aStarPath, convertPathToActions, getOptimalPath } from "./pathfinding";
+import { getDeliverySpot, getMinDistance, getTileIndex } from "./mapUtils";
 import { getConfig } from "./common";
+import { MAX_AGE_EXPLORATION } from "../../config";
 
 export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel: Parcel, path: atomicActions[], time: number } | null => {
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
@@ -16,7 +17,7 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
     const [firstParcel, ...rest] = parcels.filter(p => !p.carriedBy);
     if (!firstParcel) return null;
 
-    const pathToFirst = getOptimalPath(curPos, { x: firstParcel.x, y: firstParcel.y }, map, beliefs);
+    const pathToFirst = convertPathToActions(getOptimalPath(curPos, { x: firstParcel.x, y: firstParcel.y }, map, beliefs));
     let minLength;
     let minParcel;
     let minPath;
@@ -32,7 +33,7 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
     }
 
     for (const parcel of rest) {
-        const path = getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, map, beliefs);
+        const path = convertPathToActions(getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, map, beliefs));
         if (path == null) continue;
         const length = path.length;
         if (length < minLength) {
@@ -107,45 +108,112 @@ export const timeForPath = ({ path }: { path: atomicActions[] }) => {
 }
 
 function computeExplorationScores(
-    beliefs: BeliefBase,
-    maxAge: number
-  ): number[][] { 
-    const mapTypes = beliefs.getBelief<number[][]>("mapTypes")! as number[][];
-    const map = beliefs.getBelief<MapConfig>("map")! as MapConfig;
-    const visionRange = getConfig<number>("AGENTS_OBSERVATION_DISTANCE")!;
-    const lastVisited = beliefs.getBelief<number[][]>("lastVisited")! as number[][];
-    const currentTime = Date.now();
-    
-    const height = map.height;
-    const width = map.width;
+  beliefs: BeliefBase,
+  maxAge: number
+): number[][] {
+  const mapTypes = beliefs.getBelief<number[][]>("mapTypes")!;
+  const map = beliefs.getBelief<MapConfig>("map")!;
+  const lastVisited = beliefs.getBelief<number[][]>("lastVisited")!;
+  const currentPosition = beliefs.getBelief<{ x: number; y: number }>("position")!;
+  const visionRange = getConfig<number>("AGENTS_OBSERVATION_DISTANCE")!;
+  const currentTime = Date.now();
 
-    const scores: number[][] = Array.from({ length: height }, () =>
-      Array(width).fill(0)
-    );
-  
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (mapTypes[y][x] === 0) continue; // wall
-  
-        let score = 0;
-        for (let dy = -visionRange; dy <= visionRange; dy++) {
-          for (let dx = -visionRange; dx <= visionRange; dx++) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (
-              nx >= 0 && ny >= 0 && ny < height && nx < width &&
-              Math.abs(dx) + Math.abs(dy) <= visionRange &&
-              mapTypes[ny][nx] === 1 && 
-              currentTime - lastVisited[ny][nx] > maxAge
-            ) {
-              score++;
-            }
-          }
-        }
-        scores[y][x] = score;
+  const { height, width } = map;
+
+  // Step 1: Mark currently visible tiles
+  const visible: boolean[][] = Array.from({ length: height }, () =>
+    Array(width).fill(false)
+  );
+
+  for (let dy = -visionRange; dy <= visionRange; dy++) {
+    for (let dx = -visionRange; dx <= visionRange; dx++) {
+      const nx = currentPosition.x + dx;
+      const ny = currentPosition.y + dy;
+
+      if (
+        nx >= 0 && ny >= 0 &&
+        nx < width && ny < height &&
+        Math.abs(dx) + Math.abs(dy) <= visionRange
+      ) {
+        visible[ny][nx] = true;
       }
     }
-  
-    return scores;
   }
-  
+
+  // Step 2: Compute exploration scores
+  const scores: number[][] = Array.from({ length: height }, () =>
+    Array(width).fill(0)
+  );
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (mapTypes[x][y] !== 1) continue; // Skip walls/non-traversable tiles
+
+      let score = 0;
+      for (let dy = -visionRange; dy <= visionRange; dy++) {
+        for (let dx = -visionRange; dx <= visionRange; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+
+          if (
+            nx < 0 || ny < 0 || nx >= width || ny >= height ||
+            Math.abs(dx) + Math.abs(dy) > visionRange
+          ) continue;
+
+          // Encourage moving toward tiles that are not currently visible
+          if (
+            mapTypes[ny][nx] === 1 &&
+            !visible[ny][nx] &&
+            currentTime - lastVisited[ny][nx] > maxAge
+          ) {
+            score++;
+          }
+        }
+      }
+
+      scores[y][x] = score;
+    }
+  }
+
+  // console.log("Exploration scores (visibility-aware):", scores);
+  return scores;
+}
+
+
+export function selectBestExplorationTile(
+  beliefs: BeliefBase,
+  currentPos: Position,
+): Position | null {
+  const scores = computeExplorationScores(beliefs, MAX_AGE_EXPLORATION);
+  const distances = beliefs.getBelief<number[][]>("dist")!;
+  const mapWidth = scores[0].length;
+
+  const currentIndex = getTileIndex(currentPos, mapWidth);
+  let bestTile: Position | null = null;
+  let bestScore = -1;
+  let bestDist = Infinity;
+
+  for (let y = 0; y < scores.length; y++) {
+    for (let x = 0; x < scores[0].length; x++) {
+      const tile:Position = { x, y } as Position;
+      const score = scores[y][x];
+      if (score <= 0) continue;
+
+      const targetIndex = getTileIndex(tile, mapWidth);
+      const dist = distances[currentIndex][targetIndex];
+
+      if (
+        score > bestScore ||
+        (score === bestScore && dist < bestDist)
+      ) {
+        bestScore = score;
+        bestDist = dist;
+        bestTile = tile;
+      }
+    }
+  }
+  console.log("Best tile to explore", bestTile, "with score", bestScore, "and distance", bestDist);
+  return bestTile;
+}
+
+
