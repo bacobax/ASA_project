@@ -26,7 +26,7 @@ const types_1 = require("../types/types");
 const config_1 = require("../config");
 const common_1 = require("./utils/common");
 class AgentBDI {
-    constructor(api, strategy, teamId) {
+    constructor(api, strategy, teamId, teammatesIds) {
         this.beliefs = new beliefs_1.BeliefBase();
         this.desires = new desire_1.DesireGenerator();
         this.intentions = new intentions_1.IntentionManager();
@@ -40,6 +40,7 @@ class AgentBDI {
             onConfig: false,
         };
         this.beliefs.updateBelief("teamId", teamId);
+        this.beliefs.updateBelief("teammatesIds", teammatesIds);
         this.api = api;
         this.beliefs.updateBelief("strategy", strategy);
         console.log(`Strategy: ${strategy}`);
@@ -64,6 +65,9 @@ class AgentBDI {
             setTimeout(() => this.play(), 1000);
             return;
         }
+        console.log("I am ", this.beliefs.getBelief("id"));
+        console.log("My teammates are ", this.beliefs.getBelief("teammatesIds"));
+        console.log("My team is ", this.beliefs.getBelief("teamId"));
         setInterval(() => this.deliberate().catch(console.error), movementDuration * 2);
     }
     setupSocketHandlers() {

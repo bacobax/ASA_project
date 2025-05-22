@@ -1,6 +1,6 @@
 import { BeliefBase } from "./beliefs";
 import { atomicActions, desireType, Intention ,Position, Agent, MapConfig} from "../types/types";
-import { handlePickup, handleDeliver, handleMove } from "./plans";
+import { handlePickup, handleDeliver, handleMove, handleDeliverTeam, handlePickupTeam } from "./plans";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 
 export const planFor = (
@@ -16,6 +16,8 @@ export const planFor = (
       [desireType.PICKUP]: handlePickup,
       [desireType.DELIVER]: handleDeliver,
       [desireType.MOVE]: handleMove,
+      [desireType.PICKUP_TEAM]: handlePickupTeam,
+      [desireType.DELIVER_TEAM]: handleDeliverTeam,
     };
   
     const handler = handlers[intention.type];

@@ -1,6 +1,6 @@
 import { BeliefBase } from "./beliefs";
 import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } from "../types/types";
-import { getCenterDirectionTilePosition,  getNearestDeliverySpot, selectBestExplorationTile } from "./utils/desireUtils";
+import { getCenterDirectionTilePosition,  getNearestDeliverySpot, selectBestExplorationTile, sendHelpAvailabilityMessage } from "./utils/desireUtils";
 import {  EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 import { getConfig, Strategies } from "./utils/common";
 import { getDeliverySpot, getMinDistance } from "./utils/mapUtils";
@@ -99,6 +99,17 @@ export class DesireGenerator {
         const curPos: Position = beliefs.getBelief("position") as Position;
         const agentId = beliefs.getBelief<string>("id");
         const carryingParcels = parcels?.filter(p => p.carriedBy === agentId) ?? [];
+
+        const isCollaborating = beliefs.getBelief<boolean>("isCollaborating");
+        const role = beliefs.getBelief<string>("role");
+
+        if (isCollaborating) {
+            if (role === "explorer") {
+                desires.push({ type: desireType.PICKUP_TEAM });
+            } else if (role === "courier") {
+                desires.push({ type: desireType.DELIVER_TEAM });
+            }
+        }
 
         if (carryingParcels.length > 0) {
             // Try to pick up more if possible

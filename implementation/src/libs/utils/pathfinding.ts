@@ -190,9 +190,9 @@ export function getVisitedTilesFromPlan(startPos: Position, plan: atomicActions[
 export function getOptimalPath(
     startPos: Position,
     endPos: Position,
-    mapConfig: MapConfig,
     beliefs: BeliefBase,
 ): MapTile[]  {
+    const mapConfig = beliefs.getBelief<MapConfig>("map")!;
     if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
     const agents = beliefs.getBelief<Agent[]>(`agents`) || [];

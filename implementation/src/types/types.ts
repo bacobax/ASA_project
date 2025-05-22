@@ -66,6 +66,8 @@ export enum desireType {
     PICKUP = "pickup",
     DELIVER = "deliver",
     MOVE = "move",
+    PICKUP_TEAM = "pickup_team",
+    DELIVER_TEAM = "deliver_team",
 }
 
 /**

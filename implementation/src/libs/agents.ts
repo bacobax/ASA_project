@@ -4,7 +4,7 @@ import { IntentionManager } from "./intentions";
 import { planFor, createPlanExecutor } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { floydWarshallWithPaths } from "./utils/pathfinding";
-import { getCenterDirectionTilePosition } from "./utils/desireUtils";
+import { getCenterDirectionTilePosition, getNearestDeliverySpot } from "./utils/desireUtils";
 import {
     MapConfig, Position, atomicActions, AgentLog, Intention,
     desireType, Agent,
@@ -14,6 +14,7 @@ import {
     EXPLORATION_STEP_TOWARDS_CENTER, MAX_BLOCK_RETRIES, WAIT_FOR_AGENT_MOVE_ON
 } from "../config";
 import { getConfig, sanitizeConfigs, Strategies, writeConfigs } from "./utils/common";
+import { resetBeliefsCollaboration, sendAvailabilityMessage } from "./utils/commumications";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -67,6 +68,45 @@ export class AgentBDI {
         setInterval(() => this.deliberate().catch(console.error), movementDuration*2);
     }
     private setupSocketHandlers(): void {
+
+        this.api.onMsg(async (id, name, msg, _reply) => {
+            if (!this.beliefs.getBelief<string[]>("teammatesIds")?.includes(id)) {
+                return;
+            }
+
+            const message = JSON.parse(msg) as { type: string; data: any };
+
+            if (message.type === 'available_to_help') {
+                // A receives help availability message from B
+            if (this.intentions.getCurrentIntention()?.type !== desireType.MOVE && !this.beliefs.getBelief("isCollaborating")) {
+                const midpoint = getNearestDeliverySpot({startPosition:this.beliefs.getBelief<Position>("position") as Position, beliefs:this.beliefs});
+                await this.stopCurrentPlan();
+                this.api.say(id, JSON.stringify({
+                    type: 'help_here',
+                    data: {
+                        midpoint: midpoint
+                    }
+                }));
+                this.beliefs.updateBelief("isCollaborating", true);
+                this.beliefs.updateBelief("midpoint", midpoint);
+                this.beliefs.updateBelief("role", "explorer");
+            }
+            } else if (message.type === 'help_here') {
+                // B receives help acceptance message from A with midpoint
+                if (this.intentions.getCurrentIntention()?.type === desireType.MOVE) {
+                    await this.stopCurrentPlan();
+                    this.beliefs.updateBelief("isCollaborating", true);
+                    this.beliefs.updateBelief("midpoint", message.data.midpoint);
+                    this.beliefs.updateBelief("role", "courier");
+                } else {
+                    sendAvailabilityMessage(this.beliefs, this.api, false);
+                }
+            } else if (message.type === 'not_available_to_help') {
+                // Teammate is no longer available to help
+                resetBeliefsCollaboration(this.beliefs);
+            }
+        });
+
         this.api.onYou(data => {
             const position = { x: Math.round(data.x), y: Math.round(data.y) };
             this.beliefs.updateBelief("position", position);
@@ -142,12 +182,27 @@ export class AgentBDI {
             if (this.isPlanRunning) {
                 this.stopCurrentPlan();
             }
-            for (const desire of this.desires.generateDesires(this.beliefs)) {
+            const desires = this.desires.generateDesires(this.beliefs);
+            for (const desire of desires) {
                 const { path: plan = [], intention = null } = planFor(desire, this.beliefs) ?? {};
                 if (plan?.length && intention) {
+                    if (intention.type === desireType.MOVE) {
+                        const attemptedHelp = this.beliefs.getBelief<boolean>("attemptingToHelpTeammate");
+                        
+                        if (!attemptedHelp && desires.length === 0) {
+                            sendAvailabilityMessage(this.beliefs, this.api, true);
+                        }
+                    }else{
+                        sendAvailabilityMessage(this.beliefs, this.api, false);
+                        
+                    }
                     this.intentions.adoptIntention(intention);
                     this.currentPlan = plan;
                     return this.executePlan();
+                }else{
+                    if (this.beliefs.getBelief<boolean>("isCollaborating")) {
+                        sendAvailabilityMessage(this.beliefs, this.api, false);
+                    }
                 }
             }
 

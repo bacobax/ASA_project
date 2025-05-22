@@ -5,6 +5,7 @@ import { aStarPath, convertPathToActions, getOptimalPath } from "./pathfinding";
 import { getDeliverySpot, getMinDistance, getTileIndex } from "./mapUtils";
 import { getConfig } from "./common";
 import { MAX_AGE_EXPLORATION, MAX_DISTANCE_EXPLORATION } from "../../config";
+import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 
 export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel: Parcel, path: atomicActions[], time: number } | null => {
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
@@ -17,7 +18,7 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
     const [firstParcel, ...rest] = parcels.filter(p => !p.carriedBy);
     if (!firstParcel) return null;
 
-    const pathToFirst = convertPathToActions(getOptimalPath(curPos, { x: firstParcel.x, y: firstParcel.y }, map, beliefs));
+    const pathToFirst = convertPathToActions(getOptimalPath(curPos, { x: firstParcel.x, y: firstParcel.y }, beliefs));
     let minLength;
     let minParcel;
     let minPath;
@@ -33,7 +34,7 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
     }
 
     for (const parcel of rest) {
-        const path = convertPathToActions(getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, map, beliefs));
+        const path = convertPathToActions(getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, beliefs));
         if (path == null) continue;
         const length = path.length;
         if (length < minLength) {
@@ -215,5 +216,4 @@ export function selectBestExplorationTile(
   console.log("Best tile to explore", bestTile, "with score", bestScore, "and distance", bestDist);
   return bestTile;
 }
-
 

@@ -12,12 +12,12 @@ const strategies = [
     common_1.Strategies.aggressive,
 ];
 // Get number of agents from command line arguments
-const numAgents = process.argv.length > 1 ? parseInt(process.argv[2]) : 3;
+// const numAgents = process.argv.length > 1 ? parseInt(process.argv[2]) : 3;
 (0, multiAgentUtils_1.spawnAgents)({
-    numAgents: numAgents,
+    numAgents: 4,
     tokens: config_1.default.tokens,
     host: config_1.default.host,
     strategies: strategies,
-    teamIds: [...Array.from({ length: numAgents }, (_, i) => `team-${i}`)],
-    allowedTeamIdsPrints: ["team-0", "team-1"],
+    teamIds: ["team-1", "team-1", "team-2", "team-2"],
+    allowedTeamIdsPrints: ["team-1", "team-2"],
 });
