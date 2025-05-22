@@ -1,7 +1,7 @@
 import { BeliefBase } from "./beliefs";
 import { DesireGenerator } from "./desire";
 import { IntentionManager } from "./intentions";
-import { planFor } from "./planner";
+import { planFor, createPlanExecutor } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { floydWarshallWithPaths } from "./utils/pathfinding";
 import { getCenterDirectionTilePosition } from "./utils/desireUtils";
@@ -13,7 +13,7 @@ import {
 import {
     EXPLORATION_STEP_TOWARDS_CENTER, MAX_BLOCK_RETRIES, WAIT_FOR_AGENT_MOVE_ON
 } from "../config";
-import { sanitizeConfigs, Strategies, writeConfigs } from "./utils/common";
+import { getConfig, sanitizeConfigs, Strategies, writeConfigs } from "./utils/common";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -24,8 +24,7 @@ export class AgentBDI {
     private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
     private isPlanRunning = false;
     private planAbortSignal = false;
-    private isDeliberating = false;
-    private blockRetryCount = 0;
+
     private startSemaphore = {
         onYou: false,
         onMap: false,
@@ -53,11 +52,13 @@ export class AgentBDI {
         });
     }
     public play(): void{
+        const movementDuration = getConfig<number>("MOVEMENT_DURATION")!;
         if(!this.startSemaphore.onYou || !this.startSemaphore.onMap || !this.startSemaphore.onConfig){
             setTimeout(() => this.play(), 1000);
             return;
         }
-        setInterval(() => this.deliberate().catch(console.error), 1000);
+
+        setInterval(() => this.deliberate().catch(console.error), movementDuration*2);
     }
     private setupSocketHandlers(): void {
         this.api.onYou(data => {
@@ -127,33 +128,79 @@ export class AgentBDI {
     }
 
     private async deliberate(): Promise<void> {
-        if (this.isPlanRunning || this.isDeliberating) return;
 
-        this.isDeliberating = true;
+        this.intentions.reviseIntentions(this.beliefs);
+        const currentIntention = this.intentions.getCurrentIntention();
 
-        try {
-            this.intentions.reviseIntentions(this.beliefs);
-            const currentIntention = this.intentions.getCurrentIntention();
-
-            if (!currentIntention || this.planAbortSignal) {
-                if (this.isPlanRunning) {
-                    this.stopCurrentPlan();
-                }
-                for (const desire of this.desires.generateDesires(this.beliefs)) {
-                    const { path: plan = [], intention = null } = planFor(desire, this.beliefs) ?? {};
-                    if (plan?.length && intention) {
-                        this.intentions.adoptIntention(intention);
-                        this.currentPlan = plan;
-                        return this.executePlan();
-                    }
-                }
-
-                console.warn("No viable plan found, including fallback.");
+        if (!currentIntention || this.planAbortSignal) {
+            if (this.isPlanRunning) {
+                this.stopCurrentPlan();
             }
-        } finally {
-            this.isDeliberating = false;
+            for (const desire of this.desires.generateDesires(this.beliefs)) {
+                const { path: plan = [], intention = null } = planFor(desire, this.beliefs) ?? {};
+                if (plan?.length && intention) {
+                    this.intentions.adoptIntention(intention);
+                    this.currentPlan = plan;
+                    return this.executePlan();
+                }
+            }
+
+            console.warn("No viable plan found, including fallback.");
+        }
+    
+    }
+
+    
+
+    private async executePlan(): Promise<void> {
+        if (this.isPlanRunning) return;
+    
+        this.isPlanRunning = true;
+        this.planAbortSignal = false;
+    
+        try {
+            const executor = createPlanExecutor({
+                api: this.api,
+                plan: this.currentPlan,
+                actionMap: this.atomicActionToApi,
+                isMovingAndBlocked: this.isMovingAndAgentBlocking.bind(this),
+                shouldAbort: () => this.planAbortSignal,
+                waitTimeMs: getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
+                maxRetries: MAX_BLOCK_RETRIES,
+            });
+    
+            for await (const step of executor) {
+                console.log(`[Plan] Executed ${step.action} with status: ${step.status}`);
+                this.intentions.reviseIntentions(this.beliefs);
+            }
+    
+        } catch (err) {
+            console.error("Plan executor failed:", err);
+            this.stopCurrentPlan();
+    
+            const fallback = this.intentions.getCurrentIntention()
+                ? planFor(this.intentions.getCurrentIntention()!, this.beliefs)
+                : null;
+    
+            if (fallback) {
+                this.intentions.adoptIntention(fallback.intention);
+                this.currentPlan = fallback.path;
+                return this.executePlan();
+            }
+        }
+    
+        this.isPlanRunning = false;
+        if (!this.planAbortSignal) {
+            console.log("Plan execution completed.");
         }
     }
+    private stopCurrentPlan(): void {
+        console.log("Stopping plan.");
+        this.planAbortSignal = true;
+        this.isPlanRunning = false;
+        this.currentPlan = [];
+    }
+
 
     private isMovingAndAgentBlocking(action: atomicActions ): boolean {
         if(action !== atomicActions.moveDown && action!== atomicActions.moveLeft && action!== atomicActions.moveRight && action!== atomicActions.moveUp){
@@ -173,63 +220,5 @@ export class AgentBDI {
         const target = { x: current.x + delta.x, y: current.y + delta.y };
         const agents = this.beliefs.getBelief<Agent[]>("agents") ?? [];
         return agents.some(a => a.x === target.x && a.y === target.y);
-    }
-
-    private async executePlan(): Promise<void> {
-        if (this.isPlanRunning) return;
-    
-        this.isPlanRunning = true;
-        this.planAbortSignal = false;
-        
-
-        while (this.currentPlan.length && !this.planAbortSignal) {
-            const action = this.currentPlan.shift()!;
-            const fn = this.atomicActionToApi.get(action);
-            if (!fn) continue;
-            // const map = this.beliefs.getBelief<MapConfig>("map");
-            // console.log({map, currentIntention: this.intentions.getCurrentIntention()})
-            try {
-                const res = await fn(this.api);
-                if (!res && this.isMovingAndAgentBlocking(action)) {
-                    if (++this.blockRetryCount >= MAX_BLOCK_RETRIES) {
-                        console.log("Max block retries reached, stopping plan.");
-                        this.blockRetryCount = 0;
-                        throw new Error("Max block retries reached");
-                    }
-                    console.log("Agent blocking, waiting...");
-                    await new Promise(r => setTimeout(r, WAIT_FOR_AGENT_MOVE_ON));
-                    this.currentPlan.unshift(action);
-                } else if (!res) {
-                    this.blockRetryCount = 0;
-                    throw new Error("Action failed, action: " + action);
-                } else {
-                    this.blockRetryCount = 0;
-                }
-            } catch (err) {
-                console.error("Error executing plan:", err);
-                
-                this.stopCurrentPlan();
-                const intention = this.intentions.getCurrentIntention();
-                if (intention) {
-                    const res = planFor(intention, this.beliefs);
-                    if (res) {
-                        this.intentions.adoptIntention(res.intention);
-                        this.currentPlan = res.path;
-                        return this.executePlan();
-                    }
-                }
-                break;
-            }
-        }
-
-        this.isPlanRunning = false;
-        if (!this.planAbortSignal) console.log("Plan execution completed.");
-    }
-
-    private stopCurrentPlan(): void {
-        console.log("Stopping plan.");
-        this.planAbortSignal = true;
-        this.isPlanRunning = false;
-        this.currentPlan = [];
     }
 }

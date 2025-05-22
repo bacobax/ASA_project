@@ -3,7 +3,7 @@ import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } fro
 import { getCenterDirectionTilePosition,  getNearestDeliverySpot, selectBestExplorationTile } from "./utils/desireUtils";
 import {  EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 import { getConfig, Strategies } from "./utils/common";
-import { getMinDistance } from "./utils/mapUtils";
+import { getDeliverySpot, getMinDistance } from "./utils/mapUtils";
 import { rewardNormalizations } from "./utils/planUtils";
 
 
@@ -123,18 +123,13 @@ export class DesireGenerator {
 
         let tileToExplore = selectBestExplorationTile(beliefs, curPos);
         if (!tileToExplore) {
-            tileToExplore = getCenterDirectionTilePosition(
-                EXPLORATION_STEP_TOWARDS_CENTER,
-                curPos,
-                beliefs
-            );
+            tileToExplore = getDeliverySpot(curPos, 3, beliefs).position;
         }
         
         desires.push({
             type: desireType.MOVE,
             position: tileToExplore
         });
-
         return desires;
     }
 
