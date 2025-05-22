@@ -210,6 +210,11 @@ export function selectBestExplorationTile(
     }
   }
 
+  if (bestTile === null) {
+    console.log("No valid tile found for exploration");
+    return null;
+  }
+  
   console.log("Best tile to explore", bestTile, "with score", bestScore, "and distance", bestDist);
   return bestTile;
 }
