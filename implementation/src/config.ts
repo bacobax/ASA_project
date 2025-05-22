@@ -30,5 +30,6 @@ export const S_REWARD_WEIGHT = 0.7;
 export const S_DISTANCE_WEIGHT = 0.5;
 
 export const MAX_AGE_EXPLORATION = 10000;
+export const MAX_DISTANCE_EXPLORATION = 25;
 
 export default config;

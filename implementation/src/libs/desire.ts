@@ -69,7 +69,7 @@ const gainFromReachableParcel =(
                     Math.max(0, baseReward - Math.floor(totalTime / DECAY_INTERVAL))
                 ].reduce((a, b) => a + b, 0);
                 
-                console.log("Parcel:", parcel.id,"Reward:", parcel.reward, "Total Reward:", totalReward, "fromMeToParcelTime:", fromMeToParcelTime, "deliveryTime:", deliverytime, "totalTime:", totalTime);
+                // console.log("Parcel:", parcel.id,"Reward:", parcel.reward, "Total Reward:", totalReward, "fromMeToParcelTime:", fromMeToParcelTime, "deliveryTime:", deliverytime, "totalTime:", totalTime);
 
                 const strategy = beliefs.getBelief<Strategies>("strategy")!;
                 const normalizedTotalReward = rewardNormalizations[strategy](totalReward, totalDistance);
