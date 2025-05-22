@@ -31,7 +31,8 @@ export class AgentBDI {
         onConfig: false,
     }
 
-    constructor(api: DeliverooApi, strategy: Strategies) {
+    constructor(api: DeliverooApi, strategy: Strategies, teamId: string) {
+        this.beliefs.updateBelief("teamId", teamId);
         this.api = api;
         this.beliefs.updateBelief("strategy", strategy);
         console.log(`Strategy: ${strategy}`)
@@ -175,7 +176,12 @@ export class AgentBDI {
             }
     
         } catch (err) {
-            console.error("Plan executor failed:", err);
+            if (err instanceof Error) {
+                console.error("Plan executor failed:",err.message); // just the message, no stack trace
+            } else {
+                console.error(String(err)); // fallback for non-Error objects
+            }
+
             this.stopCurrentPlan();
     
             const fallback = this.intentions.getCurrentIntention()

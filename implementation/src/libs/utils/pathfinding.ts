@@ -205,7 +205,11 @@ export function getOptimalPath(
         return path;
     }
     catch (e) {
-        console.error("Error in pathfinding:", e);
+        if (e instanceof Error) {
+            console.error("Error in pathfinding:",e.message); // just the message, no stack trace
+        } else {
+            console.error(String(e)); // fallback for non-Error objects
+        }
         return [];
     }
     
