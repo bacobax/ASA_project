@@ -62,7 +62,21 @@ export class AgentBDI {
     }
     private setupSocketHandlers(): void {
         this.api.onYou(data => {
-            this.beliefs.updateBelief("position", { x: Math.round(data.x), y: Math.round(data.y) });
+            const position = { x: Math.round(data.x), y: Math.round(data.y) };
+            this.beliefs.updateBelief("position", position);
+            let lastVisited = this.beliefs.getBelief<number[][]>("lastVisited");
+            if (!lastVisited) {
+                const map = this.beliefs.getBelief<MapConfig>("map");
+                if (map){
+                    let lastVisitedNew : number[][] = new Array(map.width).fill(-Infinity).map(() => new Array(map.height).fill(-Infinity));
+                    lastVisitedNew[position.x][position.y] = Date.now(); 
+                    this.beliefs.updateBelief("lastVisited", lastVisitedNew); 
+                }
+            } else {
+                lastVisited[position.x][position.y] = Date.now();
+                this.beliefs.updateBelief("lastVisited", lastVisited);
+            }
+            
             this.beliefs.updateBelief("id", data.id);
             this.beliefs.updateBelief("score", data.score);
             this.startSemaphore.onYou = true;
@@ -85,14 +99,22 @@ export class AgentBDI {
 
         this.api.onMap((width, height, tiles) => {
             const validTiles = tiles.filter(t => t.type !== 0);
+            
+            let mapTypes = new Array(width).fill(0).map(() => new Array(height).fill(0));
+            for (const tile of validTiles) {
+                mapTypes[tile.x][tile.y] = tile.type;
+            }
+
             const map: MapConfig = { width, height, tiles: validTiles };
             this.beliefs.updateBelief("map", map);
+            this.beliefs.updateBelief("mapTypes", mapTypes);
+            this.beliefs.updateBelief("deliveries", tiles.filter(tile => tile.type == 2));
+            this.beliefs.updateBelief("spawnable", tiles.filter(tile => tile.type == 1));
+
             const { dist, prev, paths } = floydWarshallWithPaths(map);
             this.beliefs.updateBelief("dist", dist);
             this.beliefs.updateBelief("prev", prev);
             this.beliefs.updateBelief("paths", paths);
-            this.beliefs.updateBelief("deliveries", tiles.filter(tile => tile.type == 2));
-
            
             this.startSemaphore.onMap = true;
         });

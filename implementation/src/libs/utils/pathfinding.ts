@@ -192,7 +192,7 @@ export function getOptimalPath(
     endPos: Position,
     mapConfig: MapConfig,
     beliefs: BeliefBase,
-): atomicActions[] | null {
+): MapTile[]  {
     if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
     const agents = beliefs.getBelief<Agent[]>(`agents`) || [];
@@ -200,16 +200,20 @@ export function getOptimalPath(
         .filter(agent => agent.x !== startPos.x || agent.y !== startPos.y)
         .map(agent => ({ x: agent.x, y: agent.y }));
 
-    try {
-        
+    try{
         const path = aStarPath(startPos, endPos, mapConfig, obstacles);
-        return convertPathToActions(path);
-    } catch (error) {
-        return null;
+        return path;
     }
+    catch (e) {
+        console.error("Error in pathfinding:", e);
+        return [];
+    }
+    
+    
+    
 }
 
-function convertPathToActions(path: MapTile[]): atomicActions[] {
+export function convertPathToActions(path: MapTile[]): atomicActions[] {
     const actions: atomicActions[] = [];
     for (let i = 0; i < path.length - 1; i++) {
         const current = path[i];

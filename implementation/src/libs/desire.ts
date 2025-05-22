@@ -1,6 +1,6 @@
 import { BeliefBase } from "./beliefs";
 import { atomicActions, desireType, Intention, MapConfig, Parcel, Position } from "../types/types";
-import { getCenterDirectionTilePosition,  getNearestDeliverySpot } from "./utils/desireUtils";
+import { getCenterDirectionTilePosition,  getNearestDeliverySpot, selectBestExplorationTile } from "./utils/desireUtils";
 import {  EXPLORATION_STEP_TOWARDS_CENTER } from "../config";
 import { getConfig, Strategies } from "./utils/common";
 import { getDeliverySpot, getMinDistance } from "./utils/mapUtils";
@@ -69,7 +69,7 @@ const gainFromReachableParcel =(
                     Math.max(0, baseReward - Math.floor(totalTime / DECAY_INTERVAL))
                 ].reduce((a, b) => a + b, 0);
                 
-                console.log("Parcel:", parcel.id,"Reward:", parcel.reward, "Total Reward:", totalReward, "fromMeToParcelTime:", fromMeToParcelTime, "deliveryTime:", deliverytime, "totalTime:", totalTime);
+                // console.log("Parcel:", parcel.id,"Reward:", parcel.reward, "Total Reward:", totalReward, "fromMeToParcelTime:", fromMeToParcelTime, "deliveryTime:", deliverytime, "totalTime:", totalTime);
 
                 const strategy = beliefs.getBelief<Strategies>("strategy")!;
                 const normalizedTotalReward = rewardNormalizations[strategy](totalReward, totalDistance);
@@ -120,17 +120,15 @@ export class DesireGenerator {
         }
 
         // Always have a fallback desire to explore
-        // desires.push({
-        //     type: desireType.MOVE,
-        //     position: getCenterDirectionTilePosition(
-        //         EXPLORATION_STEP_TOWARDS_CENTER,
-        //         curPos,
-        //         beliefs
-        //     ),
-        // });
+
+        let tileToExplore = selectBestExplorationTile(beliefs, curPos);
+        if (!tileToExplore) {
+            tileToExplore = getDeliverySpot(curPos, 3, beliefs).position;
+        }
+        
         desires.push({
             type: desireType.MOVE,
-            position: getDeliverySpot(curPos, 3, beliefs).position,
+            position: tileToExplore
         });
         return desires;
     }
