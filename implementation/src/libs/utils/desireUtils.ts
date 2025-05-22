@@ -49,8 +49,6 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
 
 export const getNearestDeliverySpot = ({ startPosition, beliefs }: { startPosition: Position, beliefs: BeliefBase}) =>  getDeliverySpot(startPosition, 0, beliefs);
 
-
-
 export const getCenterDirectionTilePosition = (
     nStep: number,
     position: Position,
@@ -174,7 +172,6 @@ function computeExplorationScores(
   return scores;
 }
 
-
 export function selectBestExplorationTile(
   beliefs: BeliefBase,
   currentPos: Position,
@@ -214,7 +211,7 @@ export function selectBestExplorationTile(
     console.log("No valid tile found for exploration");
     return null;
   }
-  
+
   console.log("Best tile to explore", bestTile, "with score", bestScore, "and distance", bestDist);
   return bestTile;
 }

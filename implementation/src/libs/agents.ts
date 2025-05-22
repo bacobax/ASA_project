@@ -31,8 +31,10 @@ export class AgentBDI {
         onConfig: false,
     }
 
-    constructor(api: DeliverooApi, strategy: Strategies, teamId: string) {
+    constructor(api: DeliverooApi, strategy: Strategies, teamId: string, teammatesIds: string[]) {
         this.beliefs.updateBelief("teamId", teamId);
+        this.beliefs.updateBelief("teammatesIds", teammatesIds);
+
         this.api = api;
         this.beliefs.updateBelief("strategy", strategy);
         console.log(`Strategy: ${strategy}`)
@@ -58,6 +60,9 @@ export class AgentBDI {
             setTimeout(() => this.play(), 1000);
             return;
         }
+        console.log("I am ", this.beliefs.getBelief<string>("id"));
+        console.log("My teammates are ", this.beliefs.getBelief<string[]>("teammatesIds"));
+        console.log("My team is ", this.beliefs.getBelief<string>("teamId"));
 
         setInterval(() => this.deliberate().catch(console.error), movementDuration*2);
     }
