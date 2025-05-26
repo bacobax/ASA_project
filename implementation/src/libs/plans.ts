@@ -26,7 +26,6 @@ export function handlePickup(
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
     const curPos = beliefs.getBelief<Position>("position")!;
-    const map = beliefs.getBelief<MapConfig>("map")!;
     const strategy = beliefs.getBelief<Strategies>("strategy")!;
 
     if (!intention.possilbeParcels || intention.possilbeParcels.length === 0) {
@@ -114,7 +113,6 @@ export function handleMove(
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
     const curPos = beliefs.getBelief<Position>("position")!;
-    const map = beliefs.getBelief<MapConfig>("map")!;
 
     if (
         intention.position &&
@@ -162,26 +160,14 @@ export function handleExplorerMove(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
-    const curPos = beliefs.getBelief<Position>("position")!;
-
-    return { path: [], intention: intention };
+    return handleMove(intention, beliefs);
 }
 
 export function handleExplorerPickup(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
-    const curPos = beliefs.getBelief<Position>("position")!;
-    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
-    const carryingParcels =
-        parcels?.filter(
-            (p) => p.carriedBy === beliefs.getBelief<string>("id")
-        ) ?? [];
-
-    if (carryingParcels.length > 0) {
-    }
-
-    return { path: [], intention: intention };
+    return handlePickup(intention, beliefs);
 }
 
 export function handleExplorerDeliver(
