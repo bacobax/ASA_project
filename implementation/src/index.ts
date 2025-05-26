@@ -4,6 +4,7 @@ import config from "./config";
 import { playAgents, spawnAgents } from "./libs/utils/multiAgentUtils";
 import { Strategies } from "./libs/utils/common";
 
+
 const strategies = [
     Strategies.sophisticated,
     Strategies.linear,
