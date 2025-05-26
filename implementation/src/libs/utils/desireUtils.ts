@@ -1,24 +1,39 @@
-import { Position, atomicActions, Parcel, Agent } from "../../types/types";
+import {
+    Position,
+    atomicActions,
+    Parcel,
+    Agent,
+    desireType,
+    Intention,
+} from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { MapConfig } from "../../types/types";
 import { aStarPath, convertPathToActions, getOptimalPath } from "./pathfinding";
 import { getDeliverySpot, getMinDistance, getTileIndex } from "./mapUtils";
-import { getConfig } from "./common";
+import { getConfig, Strategies } from "./common";
 import { MAX_AGE_EXPLORATION, MAX_DISTANCE_EXPLORATION } from "../../config";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
+import { rewardNormalizations } from "./planUtils";
 
-export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel: Parcel, path: atomicActions[], time: number } | null => {
+export const getNearestParcel = ({
+    beliefs,
+}: {
+    beliefs: BeliefBase;
+}): { parcel: Parcel; path: atomicActions[]; time: number } | null => {
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
     const curPos = beliefs.getBelief<Position>("position");
     const map = beliefs.getBelief<MapConfig>("map");
     const agentId = beliefs.getBelief<string>("id");
 
-    if (!parcels || !curPos || !map || !agentId) throw new Error("Missing beliefs");
+    if (!parcels || !curPos || !map || !agentId)
+        throw new Error("Missing beliefs");
 
-    const [firstParcel, ...rest] = parcels.filter(p => !p.carriedBy);
+    const [firstParcel, ...rest] = parcels.filter((p) => !p.carriedBy);
     if (!firstParcel) return null;
 
-    const pathToFirst = convertPathToActions(getOptimalPath(curPos, { x: firstParcel.x, y: firstParcel.y }, beliefs));
+    const pathToFirst = convertPathToActions(
+        getOptimalPath(curPos, { x: firstParcel.x, y: firstParcel.y }, beliefs)
+    );
     let minLength;
     let minParcel;
     let minPath;
@@ -34,7 +49,9 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
     }
 
     for (const parcel of rest) {
-        const path = convertPathToActions(getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, beliefs));
+        const path = convertPathToActions(
+            getOptimalPath(curPos, { x: parcel.x, y: parcel.y }, beliefs)
+        );
         if (path == null) continue;
         const length = path.length;
         if (length < minLength) {
@@ -45,10 +62,20 @@ export const getNearestParcel = ({ beliefs }: { beliefs: BeliefBase }): { parcel
     }
 
     if (minParcel == null || minPath == null) return null;
-    return { parcel: minParcel, path: minPath, time: timeForPath({ path: minPath }).time };
-}
+    return {
+        parcel: minParcel,
+        path: minPath,
+        time: timeForPath({ path: minPath }).time,
+    };
+};
 
-export const getNearestDeliverySpot = ({ startPosition, beliefs }: { startPosition: Position, beliefs: BeliefBase}) =>  getDeliverySpot(startPosition, 0, beliefs);
+export const getNearestDeliverySpot = ({
+    startPosition,
+    beliefs,
+}: {
+    startPosition: Position;
+    beliefs: BeliefBase;
+}) => getDeliverySpot(startPosition, 0, beliefs);
 
 export const getCenterDirectionTilePosition = (
     nStep: number,
@@ -70,7 +97,7 @@ export const getCenterDirectionTilePosition = (
     for (let x = 0; x < map.width; x++) {
         for (let y = 0; y < map.height; y++) {
             const tile = tiles.find((t) => t.x === x && t.y === y);
-            if(!tile) continue;
+            if (!tile) continue;
             const distance = Math.abs(x - center.x) + Math.abs(y - center.y);
             if (distance < minDistance) {
                 minDistance = distance;
@@ -82,138 +109,377 @@ export const getCenterDirectionTilePosition = (
     center.x = closestTile.x;
     center.y = closestTile.y;
 
-    
-
     const agents = beliefs.getBelief<Agent[]>("agents") || [];
     const obstacles = agents
-        .filter(agent => agent.x !== position.x || agent.y !== position.y)
-        .map(agent => ({ x: agent.x, y: agent.y }));
+        .filter((agent) => agent.x !== position.x || agent.y !== position.y)
+        .map((agent) => ({ x: agent.x, y: agent.y }));
 
     const path = aStarPath(position, center, map, obstacles);
 
     if (!path || path.length === 0) {
-        throw new Error(`No path found from (${position.x},${position.y}) to map center`);
+        throw new Error(
+            `No path found from (${position.x},${position.y}) to map center`
+        );
     }
 
     const stepIndex = Math.min(nStep, path.length - 1);
     const targetTile = path[stepIndex];
     return { x: targetTile.x, y: targetTile.y };
-}
+};
 
 export const timeForPath = ({ path }: { path: atomicActions[] }) => {
     const movementSpeed = getConfig<number>("MOVEMENT_DURATION");
     if (!movementSpeed) throw new Error("MOVEMENT_DURATION not found");
     return { time: path.length * movementSpeed };
-}
+};
 
 function computeExplorationScores(
-  beliefs: BeliefBase,
-  maxAge: number,
-  maxDistance: number
+    beliefs: BeliefBase,
+    maxAge: number,
+    maxDistance: number
 ): number[][] {
-  const mapTypes = beliefs.getBelief<number[][]>("mapTypes")!;
-  const map = beliefs.getBelief<MapConfig>("map")!;
-  const lastVisited = beliefs.getBelief<number[][]>("lastVisited")!;
-  const currentPosition = beliefs.getBelief<{ x: number; y: number }>("position")!;
-  const visionRange = getConfig<number>("AGENTS_OBSERVATION_DISTANCE")!;
-  const currentTime = Date.now();
+    const mapTypes = beliefs.getBelief<number[][]>("mapTypes")!;
+    const map = beliefs.getBelief<MapConfig>("map")!;
+    const lastVisited = beliefs.getBelief<number[][]>("lastVisited")!;
+    const currentPosition = beliefs.getBelief<{ x: number; y: number }>(
+        "position"
+    )!;
+    const visionRange = getConfig<number>("AGENTS_OBSERVATION_DISTANCE")!;
+    const currentTime = Date.now();
 
-  const { height, width } = map;
+    const { height, width } = map;
 
-  // Step 1: Mark currently visible tiles
-  const visible: boolean[][] = Array.from({ length: width }, () =>
-    Array(height).fill(false)
-  );
+    // Step 1: Mark currently visible tiles
+    const visible: boolean[][] = Array.from({ length: width }, () =>
+        Array(height).fill(false)
+    );
 
-  for (let dx = -visionRange; dx <= visionRange; dx++) {
-    for (let dy = -visionRange; dy <= visionRange; dy++) {
-      const nx = currentPosition.x + dx;
-      const ny = currentPosition.y + dy;
+    for (let dx = -visionRange; dx <= visionRange; dx++) {
+        for (let dy = -visionRange; dy <= visionRange; dy++) {
+            const nx = currentPosition.x + dx;
+            const ny = currentPosition.y + dy;
 
-      if (
-        nx >= 0 && ny >= 0 &&
-        nx < width && ny < height &&
-        Math.abs(dx) + Math.abs(dy) <= visionRange
-      ) {
-        visible[nx][ny] = true;
-      }
+            if (
+                nx >= 0 &&
+                ny >= 0 &&
+                nx < width &&
+                ny < height &&
+                Math.abs(dx) + Math.abs(dy) <= visionRange
+            ) {
+                visible[nx][ny] = true;
+            }
+        }
     }
-  }
 
-  // Step 2: Compute exploration scores
-  const scores: number[][] = Array.from({ length: width }, () =>
-    Array(height).fill(0)
-  );
+    // Step 2: Compute exploration scores
+    const scores: number[][] = Array.from({ length: width }, () =>
+        Array(height).fill(0)
+    );
 
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) {
-      // Skip non-traversable tiles
-      if (mapTypes[x][y] !== 1) continue;
+    for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+            // Skip non-traversable tiles
+            if (mapTypes[x][y] !== 1) continue;
 
-      const dx = x - currentPosition.x;
-      const dy = y - currentPosition.y;
-      const distance = Math.abs(dx) + Math.abs(dy);
+            const dx = x - currentPosition.x;
+            const dy = y - currentPosition.y;
+            const distance = Math.abs(dx) + Math.abs(dy);
 
-      if (distance > maxDistance || visible[x][y]) continue;
+            if (distance > maxDistance || visible[x][y]) continue;
 
-      let age: number;
-      if (lastVisited[x][y] === -Infinity) {
-        // Tile has never been visited — give it maximum age
-        age = Number.MAX_SAFE_INTEGER;
-      } else {
-        age = currentTime - lastVisited[x][y];
-      }
+            let age: number;
+            if (lastVisited[x][y] === -Infinity) {
+                // Tile has never been visited — give it maximum age
+                age = Number.MAX_SAFE_INTEGER;
+            } else {
+                age = currentTime - lastVisited[x][y];
+            }
 
-      if (age > maxAge) {
-        scores[x][y] = age / (distance + 1); // +1 to avoid division by zero
-      }
+            if (age > maxAge) {
+                scores[x][y] = age / (distance + 1); // +1 to avoid division by zero
+            }
+        }
     }
-  }
 
-  return scores;
+    return scores;
 }
 
 export function selectBestExplorationTile(
-  beliefs: BeliefBase,
-  currentPos: Position,
+    beliefs: BeliefBase,
+    currentPos: Position
 ): Position | null {
-  const scores = computeExplorationScores(beliefs, MAX_AGE_EXPLORATION, MAX_DISTANCE_EXPLORATION);
-  const distances = beliefs.getBelief<number[][]>("dist")!;
-  const mapWidth = scores[0].length;
+    const scores = computeExplorationScores(
+        beliefs,
+        MAX_AGE_EXPLORATION,
+        MAX_DISTANCE_EXPLORATION
+    );
+    const distances = beliefs.getBelief<number[][]>("dist")!;
+    const mapWidth = scores[0].length;
 
-  const currentIndex = getTileIndex(currentPos, mapWidth);
-  let bestTile: Position | null = null;
-  let bestScore = -1;
-  let bestDist = Infinity;
+    const currentIndex = getTileIndex(currentPos, mapWidth);
+    let bestTile: Position | null = null;
+    let bestScore = -1;
+    let bestDist = Infinity;
 
-  for (let y = 0; y < scores.length; y++) {
-    for (let x = 0; x < scores[0].length; x++) {
-      const tile:Position = { x, y } as Position;
-      const score = scores[x][y];
-      
-      if (score <= 0) continue;
-      // console.log("Tile", tile, "has score", score);
+    for (let y = 0; y < scores.length; y++) {
+        for (let x = 0; x < scores[0].length; x++) {
+            const tile: Position = { x, y } as Position;
+            const score = scores[x][y];
 
-      const targetIndex = getTileIndex(tile, mapWidth);
-      const dist = distances[currentIndex][targetIndex];
+            if (score <= 0) continue;
+            // console.log("Tile", tile, "has score", score);
 
-      if (
-        score > bestScore ||
-        (score === bestScore && dist < bestDist)
-      ) {
-        bestScore = score;
-        bestDist = dist;
-        bestTile = tile;
-      }
+            const targetIndex = getTileIndex(tile, mapWidth);
+            const dist = distances[currentIndex][targetIndex];
+
+            if (score > bestScore || (score === bestScore && dist < bestDist)) {
+                bestScore = score;
+                bestDist = dist;
+                bestTile = tile;
+            }
+        }
     }
-  }
 
-  if (bestTile === null) {
-    console.log("No valid tile found for exploration");
-    return null;
-  }
+    if (bestTile === null) {
+        console.log("No valid tile found for exploration");
+        return null;
+    }
 
-  console.log("Best tile to explore", bestTile, "with score", bestScore, "and distance", bestDist);
-  return bestTile;
+    console.log(
+        "Best tile to explore",
+        bestTile,
+        "with score",
+        bestScore,
+        "and distance",
+        bestDist
+    );
+    return bestTile;
 }
 
+export function generateDesiresPickupDeliver(beliefs: BeliefBase): Intention[] {
+    const desires: Intention[] = [];
+    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+    const carryingParcels =
+        parcels?.filter(
+            (p) => p.carriedBy === beliefs.getBelief<string>("id")
+        ) ?? [];
+    const curPos: Position = beliefs.getBelief("position") as Position;
+    const isCollaborating = beliefs.getBelief<boolean>("isCollaborating");
+    const role = beliefs.getBelief<string>("role");
+
+    if (carryingParcels.length > 0) {
+        if (role != "courier") {
+            // Try to pick up more if possible
+            const additionalPickup = considerAdditionalPickup(
+                beliefs,
+                isCollaborating
+            );
+
+            if (additionalPickup) desires.push(additionalPickup);
+        }
+        switch (role) {
+            case "explorer":
+                desires.push({
+                    type: desireType.EXPLORER_DELIVER, //deliver to midpoint
+                });
+                break;
+            case "courier":
+                desires.push({
+                    type: desireType.COURIER_DELIVER, //deliver to nearest delivery spot
+                });
+                break;
+            default:
+                desires.push({
+                    type: desireType.DELIVER,
+                });
+                break;
+        }
+
+        // Deliver what you're carrying
+        //desires.push({ type: desireType.DELIVER });
+    } else if (parcels && parcels.length > 0) {
+        // Attempt pickup of available parcels
+        const pickupCandidates = parcels.filter(
+            (p) => p.carriedBy === null && p.x !== curPos.x && p.y !== curPos.y
+        );
+        if (pickupCandidates.length > 0) {
+            switch (role) {
+                case "explorer":
+                    desires.push({
+                        type: desireType.EXPLORER_PICKUP,
+                        possilbeParcels: pickupCandidates,
+                    });
+                    break;
+                case "courier":
+                    desires.push({
+                        type: desireType.COURIER_PICKUP,
+                        possilbeParcels: pickupCandidates,
+                    });
+                    break;
+                default:
+                    desires.push({
+                        type: desireType.PICKUP,
+                        possilbeParcels: pickupCandidates,
+                    });
+                    break;
+            }
+        }
+    }
+    return desires;
+}
+
+export function considerAdditionalPickup(
+    beliefs: BeliefBase,
+    cooperation: boolean = false
+): Intention | null {
+    const reachableParcels = getReachableParcels({ beliefs });
+    const DECAY_INTERVAL = getConfig<number>("PARCEL_DECADING_INTERVAL");
+    const MOVEMENT_DURATION = getConfig<number>("MOVEMENT_DURATION");
+    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+    const carryingParcels =
+        parcels?.filter(
+            (p) => p.carriedBy === beliefs.getBelief<string>("id")
+        ) ?? [];
+
+    if (!DECAY_INTERVAL || !MOVEMENT_DURATION) return null;
+
+    if (reachableParcels.length === 0) return null;
+
+    const deliverySpot = getNearestDeliverySpot({
+        startPosition: beliefs.getBelief("position") as Position,
+        beliefs,
+    });
+
+    const baseDeliveryTime = deliverySpot.distance * MOVEMENT_DURATION;
+    const baseDistance = deliverySpot.distance; // Assuming this is the distance from the current position to the delivery spo
+
+    const baseReward = carryingParcels.reduce(
+        (acc, p) =>
+            acc +
+            Math.max(
+                0,
+                p.reward - Math.floor(baseDeliveryTime / DECAY_INTERVAL)
+            ),
+        0
+    );
+
+    let bestParcel: Parcel | null = null;
+    let bestGain = -Infinity;
+    console.log("Base reward:", baseReward);
+
+    const gainFunction = gainFromReachableParcel(
+        baseReward,
+        baseDistance,
+        beliefs,
+        MOVEMENT_DURATION,
+        DECAY_INTERVAL,
+        carryingParcels
+    );
+
+    for (const reachableParcel of reachableParcels) {
+        const gain = gainFunction(reachableParcel);
+
+        if (gain > 0 && gain > bestGain) {
+            bestGain = gain;
+            bestParcel = reachableParcel.parcel;
+        }
+    }
+    const possileParcels = reachableParcels
+        .filter((RP) => gainFunction(RP) > 0)
+        .map((RP) => RP.parcel);
+
+    return bestParcel
+        ? {
+              type: desireType.PICKUP,
+              possilbeParcels: possileParcels,
+          }
+        : null;
+}
+
+export interface ReachableParcel {
+    parcel: Parcel;
+    time: number;
+    distance: number;
+}
+
+export interface ReachableParcelArgs {
+    beliefs: BeliefBase;
+    filter?: (parcel: Parcel) => boolean;
+}
+
+export const getReachableParcels = ({
+    beliefs,
+    filter,
+}: ReachableParcelArgs): ReachableParcel[] => {
+    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+    const curPos = beliefs.getBelief<Position>("position");
+    const map = beliefs.getBelief<MapConfig>("map");
+    const speed = getConfig<number>("MOVEMENT_DURATION");
+
+    if (!parcels || !curPos || !map || !speed)
+        throw new Error("Missing beliefs");
+
+    const uncarried = parcels.filter(
+        (p) => !p.carriedBy && (!filter || filter(p))
+    );
+
+    const reachable: ReachableParcel[] = [];
+
+    for (const parcel of uncarried) {
+        const distance = getMinDistance({
+            startPosition: curPos,
+            endPosition: { x: parcel.x, y: parcel.y },
+            beliefs,
+        });
+
+        const time = distance * speed;
+        reachable.push({ parcel, time, distance });
+    }
+
+    return reachable;
+};
+
+export const gainFromReachableParcel =
+    (
+        baseReward: number,
+        baseDistance: number,
+        beliefs: BeliefBase,
+        MOVEMENT_DURATION: number,
+        DECAY_INTERVAL: number,
+        carryingParcels: Parcel[]
+    ) =>
+    ({
+        parcel,
+        time: fromMeToParcelTime,
+        distance: fromMeToParcelDistance,
+    }: ReachableParcel) => {
+        const delivery = getNearestDeliverySpot({
+            startPosition: { x: parcel.x, y: parcel.y },
+            beliefs,
+        });
+
+        const deliverytime = delivery.distance * MOVEMENT_DURATION;
+        const totalTime = fromMeToParcelTime + deliverytime;
+        const totalDistance = fromMeToParcelDistance + delivery.distance;
+
+        const totalReward = [
+            ...carryingParcels.map((p) =>
+                Math.max(0, p.reward - Math.floor(totalTime / DECAY_INTERVAL))
+            ),
+            Math.max(0, baseReward - Math.floor(totalTime / DECAY_INTERVAL)),
+        ].reduce((a, b) => a + b, 0);
+
+        // console.log("Parcel:", parcel.id,"Reward:", parcel.reward, "Total Reward:", totalReward, "fromMeToParcelTime:", fromMeToParcelTime, "deliveryTime:", deliverytime, "totalTime:", totalTime);
+
+        const strategy = beliefs.getBelief<Strategies>("strategy")!;
+        const normalizedTotalReward = rewardNormalizations[strategy](
+            totalReward,
+            totalDistance
+        );
+        const normalizedBaseReward = rewardNormalizations[strategy](
+            baseReward,
+            baseDistance
+        );
+
+        return normalizedTotalReward - normalizedBaseReward;
+    };

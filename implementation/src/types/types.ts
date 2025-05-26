@@ -66,8 +66,12 @@ export enum desireType {
     PICKUP = "pickup",
     DELIVER = "deliver",
     MOVE = "move",
-    PICKUP_TEAM = "pickup_team",
-    DELIVER_TEAM = "deliver_team",
+    COURIER_MOVE = "courier_move",
+    COURIER_PICKUP = "courier_pickup",
+    COURIER_DELIVER = "courier_deliver",
+    EXPLORER_MOVE = "explorer_move",
+    EXPLORER_PICKUP = "explorer_pickup",
+    EXPLORER_DELIVER = "explorer_deliver",
 }
 
 /**
