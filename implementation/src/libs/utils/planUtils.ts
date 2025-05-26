@@ -1,5 +1,12 @@
-import { AGGRESSIVE_DISTANCE_WEIGHT, DISTANCE_WEIGHT, REWARD_WEIGHT, S_DISTANCE_WEIGHT, S_REWARD_WEIGHT } from "../../config";
-import {  Parcel, atomicActions } from "../../types/types";
+import {
+    AGGRESSIVE_DISTANCE_WEIGHT,
+    DISTANCE_WEIGHT,
+    REWARD_WEIGHT,
+    S_DISTANCE_WEIGHT,
+    S_REWARD_WEIGHT,
+} from "../../config";
+import { AgentLog, Parcel, Position, atomicActions } from "../../types/types";
+import { BeliefBase } from "../beliefs";
 import { timeForPath } from "../utils/desireUtils";
 import { Strategies } from "./common";
 
@@ -28,29 +35,71 @@ export function evaluateParcelComboPlan(
     return { score, totalTime: time };
 }
 
-export const parcelsCompare = (strategy : Strategies) => {
-    
-    return (a: Parcel & {distance:number}, b: Parcel & {distance:number}) => {
-  
-        const priorityA = a.distance !== Infinity ? rewardNormalizations[strategy](a.reward, a.distance) : 0;
-        const priorityB = b.distance !== Infinity ? rewardNormalizations[strategy](b.reward, b.distance) : 0;
+export const parcelsCompare = (strategy: Strategies) => {
+    return (
+        a: Parcel & { distance: number },
+        b: Parcel & { distance: number }
+    ) => {
+        const priorityA =
+            a.distance !== Infinity
+                ? rewardNormalizations[strategy](a.reward, a.distance)
+                : 0;
+        const priorityB =
+            b.distance !== Infinity
+                ? rewardNormalizations[strategy](b.reward, b.distance)
+                : 0;
         return priorityB - priorityA;
-    }
-}
-export const linearReward = (reward: number, distance: number, rewardWeight: number = REWARD_WEIGHT, distanceWeight: number = DISTANCE_WEIGHT): number => {
+    };
+};
+export const linearReward = (
+    reward: number,
+    distance: number,
+    rewardWeight: number = REWARD_WEIGHT,
+    distanceWeight: number = DISTANCE_WEIGHT
+): number => {
     return (reward * rewardWeight) / (distance * distanceWeight);
-}
+};
 
-export const aggressiveReward = (reward: number, distance: number, distanceWeight: number = AGGRESSIVE_DISTANCE_WEIGHT) => {
-    return reward / distance^distanceWeight;
-}
+export const aggressiveReward = (
+    reward: number,
+    distance: number,
+    distanceWeight: number = AGGRESSIVE_DISTANCE_WEIGHT
+) => {
+    return (reward / distance) ^ distanceWeight;
+};
 
-export const sophisticatedReward = (reward: number, distance: number, rewardWeight: number = S_REWARD_WEIGHT, distanceWeight: number = S_DISTANCE_WEIGHT) => {
+export const sophisticatedReward = (
+    reward: number,
+    distance: number,
+    rewardWeight: number = S_REWARD_WEIGHT,
+    distanceWeight: number = S_DISTANCE_WEIGHT
+) => {
     return (reward ^ rewardWeight) / (distance ^ distanceWeight);
-}
+};
 
 export const rewardNormalizations = {
-    [Strategies.aggressive] : aggressiveReward,
-    [Strategies.linear] : linearReward,
-    [Strategies.sophisticated] : sophisticatedReward,
+    [Strategies.aggressive]: aggressiveReward,
+    [Strategies.linear]: linearReward,
+    [Strategies.sophisticated]: sophisticatedReward,
+};
+
+export function isTeammateAtPosition(
+    target: Position,
+    beliefs: BeliefBase
+): boolean {
+    const teammates = beliefs.getBelief<string[]>("teammatesIds") || [];
+    for (const id of teammates) {
+        const teammateLogs = beliefs.getBelief<AgentLog[]>(id) || [];
+        if (teammateLogs.length > 0) {
+            const lastLog = teammateLogs[teammateLogs.length - 1];
+            if (
+                lastLog.prevPosition.x === target.x &&
+                lastLog.prevPosition.y === target.y
+            ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

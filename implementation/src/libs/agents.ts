@@ -279,15 +279,20 @@ export class AgentBDI {
                             );
                         }
                     } else {
-                        sendAvailabilityMessage(this.beliefs, this.api, false);
+                        if (
+                            intention.type == desireType.DELIVER ||
+                            intention.type == desireType.PICKUP
+                        ) {
+                            sendAvailabilityMessage(
+                                this.beliefs,
+                                this.api,
+                                false
+                            );
+                        }
                     }
                     this.intentions.adoptIntention(intention);
                     this.currentPlan = plan;
                     return this.executePlan();
-                } else {
-                    if (this.beliefs.getBelief<boolean>("isCollaborating")) {
-                        sendAvailabilityMessage(this.beliefs, this.api, false);
-                    }
                 }
             }
 
