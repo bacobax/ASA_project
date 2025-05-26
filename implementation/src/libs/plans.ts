@@ -9,13 +9,17 @@ import {
 import { BeliefBase } from "./beliefs";
 import { Strategies } from "./utils/common";
 import { getNearestDeliverySpot } from "./utils/desireUtils";
-import { getDeliverySpot } from "./utils/mapUtils";
+import {
+    getDeliverySpot,
+    getNearestTile,
+    ManhattanDistance,
+} from "./utils/mapUtils";
 import {
     convertPathToActions,
     getOptimalPath,
     getVisitedTilesFromPlan,
 } from "./utils/pathfinding";
-import { parcelsCompare } from "./utils/planUtils";
+import { isTeammateAtPosition, parcelsCompare } from "./utils/planUtils";
 
 export function handlePickup(
     intention: Intention,
@@ -185,88 +189,30 @@ export function handleExplorerDeliver(
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
     const curPos = beliefs.getBelief<Position>("position")!;
-    const deliveryPos = beliefs.getBelief<Position>("midpoint")!;
-    const path = convertPathToActions(
-        getOptimalPath(curPos, deliveryPos, beliefs)
-    );
-    if (!path) {
-        console.error("Error in pathfinding");
-        return { path: [], intention: intention };
+    const midpoint = beliefs.getBelief<Position>("midpoint")!;
+    if (ManhattanDistance(curPos, midpoint) == 1) {
+        if (isTeammateAtPosition(midpoint, beliefs)) {
+            // If a teammate is at the midpoint, drop the parcels
+            const parcelsCarried =
+                beliefs.getBelief<Parcel[]>("parcelsCarried") || [];
+            if (parcelsCarried.length > 0) {
+                return { path: [atomicActions.drop], intention: intention };
+            } else {
+                // If no parcels
+                return { path: [], intention: intention };
+            }
+        } else {
+            return { path: [atomicActions.wait], intention: intention };
+        }
+    } else {
+        const deliveryPos = getNearestTile(midpoint, curPos, beliefs);
+        const path = convertPathToActions(
+            getOptimalPath(curPos, deliveryPos, beliefs)
+        );
+        if (!path) {
+            console.error("Error in pathfinding");
+            return { path: [], intention: intention };
+        }
+        return { path: path, intention: intention };
     }
-
-    path.push(atomicActions.drop);
-    return { path: path, intention: intention };
 }
-
-// export function handleDeliverTeam(
-//     intention: Intention,
-//     beliefs: BeliefBase
-// ): { intention: Intention; path: atomicActions[] } {
-//     const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
-
-//     // Check if the agent is already at the midpoint
-//     const myPosition = beliefs.getBelief<Position>("position") as Position;
-//     if (myPosition && myPosition.x === midpoint.x && myPosition.y === midpoint.y) {
-//         // If at midpoint, wait until the explorer drops the parcels
-//         const parcelsAtMidpoint = beliefs.getBelief<Parcel[]>("parcelsAtMidpoint") || [];
-
-//         if (parcelsAtMidpoint.length > 0) {
-//             // If parcels are at midpoint, pick them up and head to the delivery spot
-//             const deliverySpot = getNearestDeliverySpot({startPosition:myPosition, beliefs:beliefs});
-//             const pathToDelivery = convertPathToActions(getOptimalPath(midpoint, deliverySpot.position, beliefs));
-//             const deliverIntent: Intention = { type: desireType.DELIVER };
-//             return {
-//                 intention: deliverIntent,
-//                 path: [...pathToDelivery, atomicActions.drop],
-//             };
-//         } else {
-//             // If no parcels, wait at midpoint
-//             return { intention: { type: desireType.MOVE, position: midpoint }, path: [atomicActions.wait] };
-//         }
-//     } else {
-//         // If not at midpoint, go to midpoint
-//         const pathToMidpoint = convertPathToActions(getOptimalPath(myPosition, midpoint, beliefs));
-//         return { intention: { type: desireType.MOVE, position: midpoint }, path: pathToMidpoint };
-//     }
-// }
-
-// export function handlePickupTeam(
-//     intention: Intention,
-//     beliefs: BeliefBase
-// ): { intention: Intention; path: atomicActions[] } {
-//     const midpoint = beliefs.getBelief<Position>("midpoint")!;
-//     const myPosition = beliefs.getBelief<Position>("position")!;
-//     const parcels = beliefs.getBelief<Parcel[]>("parcels");
-//     const parcelsCarried = beliefs.getBelief<Parcel[]>("parcelsCarried")!;
-
-//     // Check if the agent is already at the midpoint
-//     if (myPosition && myPosition.x === midpoint.x && myPosition.y === midpoint.y) {
-//         // Agent is at midpoint, need to check if courier is here
-//         const courierAtMidpoint = beliefs.getBelief<boolean>("courierAtMidpoint");
-//         if (courierAtMidpoint) {
-//             // Drop all parcels
-//             const dropParcelsActions: atomicActions[] = parcelsCarried.map(() => drop());
-//             return { intention: intention, path: [...dropParcelsActions] };
-//         } else {
-//             // If courier is not at midpoint, wait for courier
-//             return { intention: { type: desireType.MOVE, position: midpoint }, path: [atomicActions.wait] };
-//         }
-//     } else {
-//         // If not at midpoint and not carrying parcels, find a parcel and pick it up, then go to midpoint
-//         if ((parcelsCarried?.length ?? 0) === 0 && (parcels?.length ?? 0) > 0) {
-//             const nearestParcel = getNearestEntity(myPosition, parcels);
-//             const pathToParcel = getPathToPosition(myPosition, nearestParcel, beliefs).map(pos => move(pos));
-//             return {
-//                 intention: { type: desireType.MOVE, position: nearestParcel },
-//                 path: [...pathToParcel, pick(nearestParcel)]
-//             };
-//         } else if ((parcelsCarried?.length ?? 0) > 0) {
-//             // If already carrying parcels, go to midpoint
-//             const pathToMidpoint = getPathToPosition(myPosition, midpoint, beliefs).map(pos => move(pos));
-//             return { intention: { type: desireType.MOVE, position: midpoint }, path: pathToMidpoint };
-//         } else {
-//             // No parcels to pick up, return an empty plan
-//             return { intention: intention, path: [] };
-//         }
-//     }
-// }
