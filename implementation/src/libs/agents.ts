@@ -124,9 +124,7 @@ export class AgentBDI {
             if (message.type === "available_to_help") {
                 // A receives help availability message from B
                 if (
-                    this.intentions.getCurrentIntention()?.type !==
-                        desireType.MOVE &&
-                    !this.beliefs.getBelief("isCollaborating")
+                    this.needHelp()
                 ) {
                     //MID POINT CALCULATION NEEDS TO BE REDONE
                     const midpoint = getNearestDeliverySpot({
@@ -136,9 +134,9 @@ export class AgentBDI {
                         beliefs: this.beliefs,
                     });
 
-                    //EVALUATE IF WE SHOULD FINISH DELIVERING OR NOT
-
+                    //TODO: EVALUATE IF WE SHOULD FINISH DELIVERING OR NOT
                     await this.stopCurrentPlan();
+
                     this.api.say(
                         id,
                         JSON.stringify({
@@ -253,6 +251,12 @@ export class AgentBDI {
         });
     }
 
+    private needHelp() {
+        return this.intentions.getCurrentIntention()?.type !==
+            desireType.MOVE &&
+            !this.beliefs.getBelief("isCollaborating");
+    }
+
     private async deliberate(): Promise<void> {
         this.intentions.reviseIntentions(this.beliefs);
         const currentIntention = this.intentions.getCurrentIntention();
@@ -263,8 +267,7 @@ export class AgentBDI {
             }
             const desires = this.desires.generateDesires(this.beliefs);
             for (const desire of desires) {
-                const { path: plan = [], intention = null } =
-                    planFor(desire, this.beliefs) ?? {};
+                const { path: plan = [], intention = null } = planFor(desire, this.beliefs) ?? {};
                 if (plan?.length && intention) {
                     if (intention.type === desireType.MOVE) {
                         const attemptedHelp = this.beliefs.getBelief<boolean>(

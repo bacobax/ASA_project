@@ -24,7 +24,7 @@ export class DesireGenerator {
         const desires: Intention[] = [];
 
         desires.concat(this.generateDesiresPickupDeliver(beliefs));
-
+        
         desires.concat(this.generateDesiresMove(beliefs));
 
         return desires;
