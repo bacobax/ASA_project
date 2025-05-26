@@ -131,13 +131,6 @@ export function handleMove(
     return { path: [], intention: intention };
 }
 
-export function handleCourierMove(
-    intention: Intention,
-    beliefs: BeliefBase
-): { intention: Intention; path: atomicActions[] } {
-    const curPos = beliefs.getBelief<Position>("position")!;
-    return { path: [], intention: intention };
-}
 
 export function handleCourierPickup(
     intention: Intention,
@@ -154,6 +147,15 @@ export function handleCourierDeliver(
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
     return { intention: intention, path: [] };
+}
+
+export function handleCourierMove(
+    intention: Intention,
+    beliefs: BeliefBase
+): { intention: Intention; path: atomicActions[] } {
+    const curPos = beliefs.getBelief<Position>("position")!;
+    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+
 }
 
 export function handleExplorerMove(
