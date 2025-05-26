@@ -19,7 +19,11 @@ import {
     getOptimalPath,
     getVisitedTilesFromPlan,
 } from "./utils/pathfinding";
-import { isTeammateAtPosition, parcelsCompare } from "./utils/planUtils";
+import {
+    isTeammateAdjacentToPosition,
+    isTeammateAtPosition,
+    parcelsCompare,
+} from "./utils/planUtils";
 
 export function handlePickup(
     intention: Intention,
@@ -135,8 +139,23 @@ export function handleCourierMove(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
+    const midpoint = beliefs.getBelief<Position>("midpoint")!;
     const curPos = beliefs.getBelief<Position>("position")!;
-    return { path: [], intention: intention };
+
+    if (curPos.x === midpoint.x && curPos.y === midpoint.y) {
+        if (isTeammateAdjacentToPosition(midpoint, beliefs)) {
+            // If a teammate is adjacent to the midpoint, wait
+            return { path: [atomicActions.wait], intention: intention };
+        } else {
+            return { path: [atomicActions.wait], intention: intention };
+        }
+    } else {
+        const newIntention = {
+            type: desireType.COURIER_MOVE,
+            position: midpoint,
+        };
+        return handleMove(newIntention, beliefs);
+    }
 }
 
 export function handleCourierPickup(

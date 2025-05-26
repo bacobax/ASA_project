@@ -103,3 +103,23 @@ export function isTeammateAtPosition(
 
     return false;
 }
+
+export function isTeammateAdjacentToPosition(
+    target: Position,
+    beliefs: BeliefBase
+): boolean {
+    const teammates = beliefs.getBelief<string[]>("teammatesIds") || [];
+    for (const id of teammates) {
+        const teammateLogs = beliefs.getBelief<AgentLog[]>(id) || [];
+        if (teammateLogs.length > 0) {
+            const lastLog = teammateLogs[teammateLogs.length - 1];
+            const dx = Math.abs(lastLog.prevPosition.x - target.x);
+            const dy = Math.abs(lastLog.prevPosition.y - target.y);
+            if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
