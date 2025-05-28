@@ -3,17 +3,22 @@ export interface Position {
     y: number;
 }
 
+export interface IntentionDetails {
+    deliverySpot?: Position;
+    parcelsToPickup?: Parcel[];
+    targetPosition?: Position;
+}
+
 export interface Intention {
     type: desireType;
-    parcelId?: string;
-    position?: Position;
+    details?: IntentionDetails;
     possilbeParcels?: Parcel[];
 }
 
 export interface MapTile {
     x: number;
     y: number;
-    type?: number
+    type?: number;
 }
 
 export interface MapConfig {
@@ -21,7 +26,7 @@ export interface MapConfig {
     height: number;
     tiles: MapTile[];
 }
- 
+
 export interface Agent {
     id: string;
     name: string;
@@ -30,11 +35,10 @@ export interface Agent {
     score: number;
 }
 
-export interface AgentLog{
-    prevPosition :Position;
+export interface AgentLog {
+    prevPosition: Position;
     timestamp: number;
 }
-
 
 export interface Parcel {
     id: string;
@@ -72,6 +76,7 @@ export enum desireType {
     EXPLORER_MOVE = "explorer_move",
     EXPLORER_PICKUP = "explorer_pickup",
     EXPLORER_DELIVER = "explorer_deliver",
+    EXPLORER_DELIVER_ON_PATH = "explorer_deliver_on_path",
 }
 
 /**
@@ -93,7 +98,7 @@ export enum desireType {
     BROADCAST_LOGS: false
   }
  */
-export interface ServerConfig{
+export interface ServerConfig {
     MAP_FILE: string;
     PARCELS_GENERATION_INTERVAL: number; //to sanitize
     PARCELS_MAX: string;

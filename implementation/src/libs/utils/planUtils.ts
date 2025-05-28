@@ -9,6 +9,7 @@ import { AgentLog, Parcel, Position, atomicActions } from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { timeForPath } from "../utils/desireUtils";
 import { Strategies } from "./common";
+import { ManhattanDistance } from "./mapUtils";
 
 export interface ParcelPlanStep {
     parcel: Parcel;
@@ -121,5 +122,15 @@ export function isTeammateAdjacentToPosition(
         }
     }
 
+    return false;
+}
+
+export function isParcelAdajacentToPosition(
+    target: Position,
+    parcel: Parcel
+): boolean {
+    if (ManhattanDistance(target, parcel) === 1) {
+        return true;
+    }
     return false;
 }

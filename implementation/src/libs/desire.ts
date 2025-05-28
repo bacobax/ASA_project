@@ -24,7 +24,7 @@ export class DesireGenerator {
         const desires: Intention[] = [];
 
         desires.concat(this.generateDesiresPickupDeliver(beliefs));
-        
+
         desires.concat(this.generateDesiresMove(beliefs));
 
         return desires;
@@ -116,7 +116,9 @@ export class DesireGenerator {
 
             desires.push({
                 type: desireType.EXPLORER_MOVE,
-                position: tileToExplore,
+                details: {
+                    targetPosition: tileToExplore,
+                },
             });
         } else if (role === "courier") {
             // Move towards the nearest delivery spot
@@ -130,7 +132,9 @@ export class DesireGenerator {
             }
             desires.push({
                 type: desireType.MOVE,
-                position: tileToExplore,
+                details: {
+                    targetPosition: tileToExplore,
+                },
             });
         }
 

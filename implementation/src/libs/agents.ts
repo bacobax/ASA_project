@@ -71,19 +71,23 @@ export class AgentBDI {
 
     private initActionHandlers(): void {
         this.atomicActionToApi.set(atomicActions.moveRight, (api) =>
-            api.move("right")
+            api.emitMove("right")
         );
         this.atomicActionToApi.set(atomicActions.moveLeft, (api) =>
-            api.move("left")
+            api.emitMove("left")
         );
         this.atomicActionToApi.set(atomicActions.moveUp, (api) =>
-            api.move("up")
+            api.emitMove("up")
         );
         this.atomicActionToApi.set(atomicActions.moveDown, (api) =>
-            api.move("down")
+            api.emitMove("down")
         );
-        this.atomicActionToApi.set(atomicActions.pickup, (api) => api.pickup());
-        this.atomicActionToApi.set(atomicActions.drop, (api) => api.putdown());
+        this.atomicActionToApi.set(atomicActions.pickup, (api) =>
+            api.emitPickup()
+        );
+        this.atomicActionToApi.set(atomicActions.drop, (api) =>
+            api.emitPutdown()
+        );
         this.atomicActionToApi.set(atomicActions.wait, async (_) => {
             await new Promise((res) => setTimeout(res, 1000));
             return true;
@@ -123,9 +127,7 @@ export class AgentBDI {
 
             if (message.type === "available_to_help") {
                 // A receives help availability message from B
-                if (
-                    this.needHelp()
-                ) {
+                if (this.needHelp()) {
                     //MID POINT CALCULATION NEEDS TO BE REDONE
                     const midpoint = getNearestDeliverySpot({
                         startPosition: this.beliefs.getBelief<Position>(
@@ -137,7 +139,7 @@ export class AgentBDI {
                     //TODO: EVALUATE IF WE SHOULD FINISH DELIVERING OR NOT
                     await this.stopCurrentPlan();
 
-                    this.api.say(
+                    this.api.emitSay(
                         id,
                         JSON.stringify({
                             type: "help_here",
@@ -197,6 +199,18 @@ export class AgentBDI {
 
         this.api.onParcelsSensing((parcels) => {
             this.beliefs.updateBelief("visibleParcels", parcels);
+            const teammateIds =
+                this.beliefs.getBelief<string[]>("teammatesIds");
+            const teammateCarryingParcels = parcels.filter(
+                (p) => p.carriedBy && teammateIds?.includes(p.carriedBy)
+            );
+            if (teammateCarryingParcels.length > 0) {
+                this.beliefs.updateBelief(
+                    "teammateCarryingParcels",
+                    teammateCarryingParcels
+                );
+            }
+
             this.intentions.reviseIntentions(this.beliefs);
         });
 
@@ -252,9 +266,10 @@ export class AgentBDI {
     }
 
     private needHelp() {
-        return this.intentions.getCurrentIntention()?.type !==
-            desireType.MOVE &&
-            !this.beliefs.getBelief("isCollaborating");
+        return (
+            this.intentions.getCurrentIntention()?.type !== desireType.MOVE &&
+            !this.beliefs.getBelief("isCollaborating")
+        );
     }
 
     private async deliberate(): Promise<void> {
@@ -267,7 +282,8 @@ export class AgentBDI {
             }
             const desires = this.desires.generateDesires(this.beliefs);
             for (const desire of desires) {
-                const { path: plan = [], intention = null } = planFor(desire, this.beliefs) ?? {};
+                const { path: plan = [], intention = null } =
+                    planFor(desire, this.beliefs) ?? {};
                 if (plan?.length && intention) {
                     if (intention.type === desireType.MOVE) {
                         const attemptedHelp = this.beliefs.getBelief<boolean>(
