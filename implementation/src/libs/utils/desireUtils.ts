@@ -11,7 +11,7 @@ import { MapConfig } from "../../types/types";
 import { aStarPath, convertPathToActions, getOptimalPath } from "./pathfinding";
 import { getDeliverySpot, getMinDistance, getTileIndex } from "./mapUtils";
 import { getConfig, Strategies } from "./common";
-import { MAX_AGE_EXPLORATION, MAX_DISTANCE_EXPLORATION } from "../../config";
+import { MAX_DISTANCE_EXPLORATION } from "../../config";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { rewardNormalizations } from "./planUtils";
 
@@ -135,7 +135,6 @@ export const timeForPath = ({ path }: { path: atomicActions[] }) => {
 
 function computeExplorationScores(
     beliefs: BeliefBase,
-    maxAge: number,
     maxDistance: number
 ): number[][] {
     const mapTypes = beliefs.getBelief<number[][]>("mapTypes")!;
@@ -179,7 +178,7 @@ function computeExplorationScores(
     for (let x = 0; x < width; x++) {
         for (let y = 0; y < height; y++) {
             // Skip non-traversable tiles
-            if (mapTypes[x][y] !== 1) continue;
+            if (mapTypes[x][y] !==1) continue;
 
             const dx = x - currentPosition.x;
             const dy = y - currentPosition.y;
@@ -192,12 +191,13 @@ function computeExplorationScores(
                 // Tile has never been visited — give it maximum age
                 age = Number.MAX_SAFE_INTEGER;
             } else {
+                
                 age = currentTime - lastVisited[x][y];
             }
 
-            if (age > maxAge) {
-                scores[x][y] = age / (distance + 1); // +1 to avoid division by zero
-            }
+            
+            scores[x][y] = age / (distance + 1); // +1 to avoid division by zero
+            
         }
     }
 
@@ -210,7 +210,6 @@ export function selectBestExplorationTile(
 ): Position | null {
     const scores = computeExplorationScores(
         beliefs,
-        MAX_AGE_EXPLORATION,
         MAX_DISTANCE_EXPLORATION
     );
     const distances = beliefs.getBelief<number[][]>("dist")!;
@@ -245,14 +244,14 @@ export function selectBestExplorationTile(
         return null;
     }
 
-    console.log(
-        "Best tile to explore",
-        bestTile,
-        "with score",
-        bestScore,
-        "and distance",
-        bestDist
-    );
+    // console.log(
+    //     "Best tile to explore",
+    //     bestTile,
+    //     "with score",
+    //     bestScore,
+    //     "and distance",
+    //     bestDist
+    // );
     return bestTile;
 }
 

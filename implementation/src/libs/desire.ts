@@ -4,7 +4,7 @@ import {
     considerAdditionalPickup,
     selectBestExplorationTile,
 } from "./utils/desireUtils";
-import { getDeliverySpot } from "./utils/mapUtils";
+import { getDeliverySpot, ManhattanDistance } from "./utils/mapUtils";
 
 /**
  * DesireGenerator class handles the generation of desires (intentions) based on the agent's beliefs
@@ -20,12 +20,13 @@ export class DesireGenerator {
      * Generates all possible intentions based on the agent's current belief base.
      */
     generateDesires(beliefs: BeliefBase): Intention[] {
-        console.log("-----Generating Desire Options-----");
+        // console.log("-----Generating Desire Options-----");
         const desires: Intention[] = [];
 
-        desires.concat(this.generateDesiresPickupDeliver(beliefs));
-
-        desires.concat(this.generateDesiresMove(beliefs));
+        desires.push(
+            ...this.generateDesiresPickupDeliver(beliefs)
+        );
+        desires.push(...this.generateDesiresMove(beliefs));
 
         return desires;
     }
@@ -75,15 +76,32 @@ export class DesireGenerator {
             // Attempt pickup of available parcels
             const pickupCandidates = parcels.filter(
                 (p) =>
-                    p.carriedBy === null && p.x !== curPos.x && p.y !== curPos.y
+                    p.carriedBy === null
             );
             if (pickupCandidates.length > 0) {
                 switch (role) {
                     case "explorer":
-                        desires.push({
-                            type: desireType.EXPLORER_PICKUP,
-                            possilbeParcels: pickupCandidates,
-                        });
+                        const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
+                        const distanceToMidpoint = ManhattanDistance(
+                            curPos,
+                            midpoint
+                        );
+                        if (distanceToMidpoint == 1){
+                            const pickupCandidatesNotDroppedNearMidpoint = pickupCandidates.filter(
+                                (p) =>
+                                    !(p.x === curPos.x && p.y === curPos.y)
+                            );
+                            desires.push({
+                                type: desireType.EXPLORER_PICKUP,
+                                possilbeParcels: pickupCandidatesNotDroppedNearMidpoint,
+                            });
+                        }else{
+
+                            desires.push({
+                                type: desireType.EXPLORER_PICKUP,
+                                possilbeParcels: pickupCandidates,
+                            });
+                        }
                         break;
                     case "courier":
                         desires.push({

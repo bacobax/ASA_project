@@ -1,6 +1,7 @@
 import { BeliefBase } from "./beliefs";
 import { desireType, Intention, Parcel, Position } from "../types/types";
 import { getConfig } from "./utils/common";
+import { ManhattanDistance } from "./utils/mapUtils";
 
 export class IntentionManager {
     private activeIntention: Intention | null = null;
@@ -34,7 +35,7 @@ export class IntentionManager {
             intention.type === desireType.COURIER_PICKUP
         ) {
             const agentId = beliefs.getBelief<string>("id");
-            const agentPosition = beliefs.getBelief<Position>("position");
+            const curPos = beliefs.getBelief<Position>("position");
             const visibleParcels =
                 beliefs.getBelief<Parcel[]>("visibleParcels") ?? [];
             const possibleParcels = intention.details?.parcelsToPickup;
@@ -44,22 +45,20 @@ export class IntentionManager {
 
             if (
                 possibleParcels?.some((parcel) => {
-                    const isCarriedByOther =
-                        parcel.carriedBy !== null &&
-                        parcel.carriedBy !== agentId;
-
                     const isWithinVision =
-                        agentPosition &&
-                        Math.hypot(
-                            parcel.x - agentPosition.x,
-                            parcel.y - agentPosition.y
-                        ) <= visionRange;
-
-                    const isMissingInVision =
-                        isWithinVision &&
-                        !visibleParcels.some((p) => p.id === parcel.id);
-
-                    return isCarriedByOther || isMissingInVision;
+                        curPos &&
+                        ManhattanDistance(parcel,curPos) <= visionRange;
+            
+                    // Try to find the parcel in the current visible parcels
+                    const seenParcel = visibleParcels.find((p) => p.id === parcel.id);
+            
+                    // If it's within vision but not seen, it's missing
+                    const isMissingInVision = isWithinVision && !seenParcel;
+            
+                    // If it's seen and carried by someone 
+                    const isCarried = seenParcel && seenParcel.carriedBy !== null;
+            
+                    return isCarried || isMissingInVision;
                 })
             ) {
                 this.dropCurrentIntention();

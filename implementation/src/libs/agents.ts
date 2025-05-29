@@ -94,7 +94,7 @@ export class AgentBDI {
         });
     }
     public play(): void {
-        const movementDuration = getConfig<number>("MOVEMENT_DURATION")!;
+        
         if (
             !this.startSemaphore.onYou ||
             !this.startSemaphore.onMap ||
@@ -103,13 +103,7 @@ export class AgentBDI {
             setTimeout(() => this.play(), 1000);
             return;
         }
-        console.log("I am ", this.beliefs.getBelief<string>("id"));
-        console.log(
-            "My teammates are ",
-            this.beliefs.getBelief<string[]>("teammatesIds")
-        );
-        console.log("My team is ", this.beliefs.getBelief<string>("teamId"));
-
+        const movementDuration = getConfig<number>("MOVEMENT_DURATION")!;
         setInterval(
             () => this.deliberate().catch(console.error),
             movementDuration * 2
@@ -156,7 +150,7 @@ export class AgentBDI {
                 // B receives help acceptance message from A with midpoint
                 if (
                     this.intentions.getCurrentIntention()?.type ===
-                    desireType.MOVE
+                    desireType.MOVE || this.intentions.getCurrentIntention() === null
                 ) {
                     await this.stopCurrentPlan();
                     this.beliefs.updateBelief("isCollaborating", true);
@@ -290,7 +284,7 @@ export class AgentBDI {
                             "attemptingToHelpTeammate"
                         );
 
-                        if (!attemptedHelp && desires.length === 0) {
+                        if (!attemptedHelp) {
                             sendAvailabilityMessage(
                                 this.beliefs,
                                 this.api,
@@ -336,12 +330,11 @@ export class AgentBDI {
                     getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
                 maxRetries: MAX_BLOCK_RETRIES,
             });
-
             for await (const step of executor) {
-                console.log(
-                    `[Plan] Executed ${step.action} with status: ${step.status}`
-                );
-                this.intentions.reviseIntentions(this.beliefs);
+                // console.log(
+                //     `[Plan] Executed ${step.action} with status: ${step.status}`
+                // );
+                // this.intentions.reviseIntentions(this.beliefs);
             }
         } catch (err) {
             if (err instanceof Error) {
@@ -352,27 +345,26 @@ export class AgentBDI {
 
             this.stopCurrentPlan();
 
-            const fallback = this.intentions.getCurrentIntention()
-                ? planFor(this.intentions.getCurrentIntention()!, this.beliefs)
-                : null;
+            // const fallback = this.intentions.getCurrentIntention()
+            //     ? planFor(this.intentions.getCurrentIntention()!, this.beliefs)
+            //     : null;
 
-            if (fallback) {
-                this.intentions.adoptIntention(fallback.intention);
-                this.currentPlan = fallback.path;
-                return this.executePlan();
-            }
+            // if (fallback) {
+            //     this.intentions.adoptIntention(fallback.intention);
+            //     this.currentPlan = fallback.path;
+            //     return this.executePlan();
+            // }
         }
 
-        this.isPlanRunning = false;
+        
         if (!this.planAbortSignal) {
-            console.log("Plan execution completed.");
+            this.isPlanRunning = false;
         }
     }
     private stopCurrentPlan(): void {
         console.log("Stopping plan.");
         this.planAbortSignal = true;
         this.isPlanRunning = false;
-        this.currentPlan = [];
     }
 
     private isMovingAndAgentBlocking(action: atomicActions): boolean {
