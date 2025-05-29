@@ -292,7 +292,7 @@ export function considerAdditionalPickup(
 
     let bestParcel: Parcel | null = null;
     let bestGain = -Infinity;
-    console.log("Base reward:", baseReward);
+    // console.log("Base reward:", baseReward);
 
     const gainFunction = gainFromReachableParcel(
         baseReward,
@@ -318,7 +318,7 @@ export function considerAdditionalPickup(
     return bestParcel
         ? {
               type: desireType.PICKUP,
-              possilbeParcels: possileParcels,
+              possibleParcels: possileParcels,
           }
         : null;
 }

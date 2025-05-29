@@ -9,7 +9,7 @@ import { AgentLog, Parcel, Position, atomicActions } from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { timeForPath } from "../utils/desireUtils";
 import { Strategies } from "./common";
-import { ManhattanDistance } from "./mapUtils";
+import { manhattanDistance } from "./mapUtils";
 
 export interface ParcelPlanStep {
     parcel: Parcel;
@@ -88,17 +88,14 @@ export function isTeammateAtPosition(
     target: Position,
     beliefs: BeliefBase
 ): boolean {
-    const teammates = beliefs.getBelief<string[]>("teammatesIds") || [];
-    for (const id of teammates) {
-        const teammateLogs = beliefs.getBelief<AgentLog[]>(id) || [];
-        if (teammateLogs.length > 0) {
-            const lastLog = teammateLogs[teammateLogs.length - 1];
-            if (
-                lastLog.prevPosition.x === target.x &&
-                lastLog.prevPosition.y === target.y
-            ) {
-                return true;
-            }
+    const teammatesPositions = beliefs.getBelief<Record<string, Position>>(
+        "teammatesPositions"
+    ) || {};
+    for( const id in teammatesPositions) {
+        const pos = teammatesPositions[id];
+        // Check if the teammate's position matches the target position
+        if (pos.x === target.x && pos.y === target.y) {
+            return true;
         }
     }
 
@@ -129,7 +126,7 @@ export function isParcelAdajacentToPosition(
     target: Position,
     parcel: Parcel
 ): boolean {
-    if (ManhattanDistance(target, parcel) === 1) {
+    if (manhattanDistance(target, parcel) === 1) {
         return true;
     }
     return false;

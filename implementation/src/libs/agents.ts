@@ -19,8 +19,10 @@ import {
     Parcel,
 } from "../types/types";
 import {
+    COLLABORATION_TIMEOUT,
     EXPLORATION_STEP_TOWARDS_CENTER,
     MAX_BLOCK_RETRIES,
+    RESQUEST_TIMEOUT_RANGE,
     WAIT_FOR_AGENT_MOVE_ON,
 } from "../config";
 import {
@@ -33,14 +35,19 @@ import {
     resetBeliefsCollaboration,
     sendAvailabilityMessage,
 } from "./utils/commumications";
+import {
+    calculateMidpoint,
+    canReachDeliverySpot,
+    canReachSpawnableSpot,
+} from "./utils/mapUtils";
 
 export class AgentBDI {
     private api: DeliverooApi;
-    
+
     private beliefs: BeliefBase = new BeliefBase();
     private desires = new DesireGenerator();
     private intentions = new IntentionManager();
-    
+
     private atomicActionToApi = new Map<
         atomicActions,
         (api: DeliverooApi) => Promise<any>
@@ -49,6 +56,9 @@ export class AgentBDI {
     private currentPlan: atomicActions[] = [];
     private planPromise: Promise<void> | null = null;
     private planAbortSignal = false;
+    private lastCollaborationTime: number | null = null;
+
+    private nextRequestTime = Date.now();
 
     private startSemaphore = {
         onYou: false,
@@ -60,7 +70,8 @@ export class AgentBDI {
         api: DeliverooApi,
         strategy: Strategies,
         teamId: string,
-        teammatesIds: string[]
+        teammatesIds: string[],
+        id: string
     ) {
         this.beliefs.updateBelief("teamId", teamId);
         this.beliefs.updateBelief("teammatesIds", teammatesIds);
@@ -97,7 +108,6 @@ export class AgentBDI {
         });
     }
     public play(): void {
-        
         if (
             !this.startSemaphore.onYou ||
             !this.startSemaphore.onMap ||
@@ -119,22 +129,23 @@ export class AgentBDI {
             ) {
                 return;
             }
+            const collaborating =
+                this.beliefs.getBelief<boolean>("isCollaborating");
 
             const message = JSON.parse(msg) as { type: string; data: any };
 
-            if (message.type === "available_to_help") {
+            if (message.type === "available_to_help" && !collaborating) {
                 // A receives help availability message from B
                 if (this.needHelp()) {
                     //MID POINT CALCULATION NEEDS TO BE REDONE
-                    const midpoint = getNearestDeliverySpot({
-                        startPosition: this.beliefs.getBelief<Position>(
-                            "position"
-                        ) as Position,
-                        beliefs: this.beliefs,
-                    });
+                    const midpoint = calculateMidpoint(this.beliefs);
+                    console.log("Midpoint calculated:", midpoint);
 
                     //TODO: EVALUATE IF WE SHOULD FINISH DELIVERING OR NOT
                     await this.stopCurrentPlan();
+
+                    console.log("i am **EXPLORER**");
+                    this.lastCollaborationTime = Date.now();
 
                     this.api.emitSay(
                         id,
@@ -148,14 +159,19 @@ export class AgentBDI {
                     this.beliefs.updateBelief("isCollaborating", true);
                     this.beliefs.updateBelief("midpoint", midpoint);
                     this.beliefs.updateBelief("role", "explorer");
+                } else {
+                    // If we don't need help, send availability message
+                    sendAvailabilityMessage(this.beliefs, this.api, false);
                 }
-            } else if (message.type === "help_here") {
+            } else if (message.type === "help_here" && !collaborating) {
                 // B receives help acceptance message from A with midpoint
                 if (
                     this.intentions.getCurrentIntention()?.type ===
-                    desireType.MOVE || this.intentions.getCurrentIntention() === null
+                        desireType.MOVE ||
+                    this.intentions.getCurrentIntention() === null
                 ) {
                     await this.stopCurrentPlan();
+                    console.log("i am **COURIER**");
                     this.beliefs.updateBelief("isCollaborating", true);
                     this.beliefs.updateBelief(
                         "midpoint",
@@ -168,6 +184,18 @@ export class AgentBDI {
             } else if (message.type === "not_available_to_help") {
                 // Teammate is no longer available to help
                 resetBeliefsCollaboration(this.beliefs);
+            } else if (message.type === "position_update") {
+                // Teammate sends their position update
+                const newTeammatePosition = message.data.position as Position;
+                const teammatesPositions =
+                    this.beliefs.getBelief<Record<string, Position>>(
+                        "teammatesPositions"
+                    ) || {};
+                teammatesPositions[id] = newTeammatePosition;
+                this.beliefs.updateBelief(
+                    "teammatesPositions",
+                    teammatesPositions
+                );
             }
         });
 
@@ -192,6 +220,25 @@ export class AgentBDI {
             this.beliefs.updateBelief("id", data.id);
             this.beliefs.updateBelief("score", data.score);
             this.startSemaphore.onYou = true;
+
+            //send message to teammates with our position
+            const teammatesIds =
+                this.beliefs.getBelief<string[]>("teammatesIds");
+            if (teammatesIds && teammatesIds.length > 0) {
+                for (const teammateId of teammatesIds) {
+                    this.api.emitSay(
+                        teammateId,
+                        JSON.stringify({
+                            type: "position_update",
+                            data: {
+                                position,
+                                id: data.id,
+                                name: data.name,
+                            },
+                        })
+                    );
+                }
+            }
         });
 
         this.api.onParcelsSensing((parcels) => {
@@ -263,72 +310,105 @@ export class AgentBDI {
     }
 
     private needHelp() {
-        return (
-            this.intentions.getCurrentIntention()?.type !== desireType.MOVE &&
-            !this.beliefs.getBelief("isCollaborating")
-        );
+        const reachSpawnable = canReachSpawnableSpot(this.beliefs);
+        const isCollaborating = this.beliefs.getBelief<boolean>("isCollaborating");
+        const currentIntention = this.intentions.getCurrentIntention();
+    
+        const isMoveOrNull =
+            !currentIntention || currentIntention.type !== desireType.MOVE;
+    
+        return reachSpawnable && !isCollaborating && isMoveOrNull;
     }
 
     private async deliberate(): Promise<void> {
+        
+        if (
+            this.lastCollaborationTime &&
+            Date.now() - this.lastCollaborationTime > COLLABORATION_TIMEOUT
+        ) {
+            console.log("Collaboration timeout reached, resetting beliefs.");
+            sendAvailabilityMessage(this.beliefs, this.api, false);
+
+            this.lastCollaborationTime = null;
+        }
+
         this.intentions.reviseIntentions(this.beliefs);
         const currentIntention = this.intentions.getCurrentIntention();
 
         if (!currentIntention || this.planAbortSignal) {
+            console.log("Deliberating...");
             if (this.planPromise) {
                 this.stopCurrentPlan();
             }
-            const desires = this.desires.generateDesires(this.beliefs);
-    
-            for (const desire of desires) {
-                const result = planFor(desire, this.beliefs);
-                if (!result) continue;
-    
-                const { path: plan = [], intention = null } = result;
-    
-                if (plan?.length && intention) {
-                    return this.startPlanSafely(plan, intention);
-                }
-            }
-    
-            console.warn("No viable plan found, including fallback.");
-        }
-    }
-    
-    private async startPlanSafely(plan: atomicActions[], intention: Intention): Promise<void> {
-        if (this.planPromise) {
-            // console.log("Plan already running, skipping new start.");
-            return;
-        }
-    
-        this.planAbortSignal = false;
-        this.intentions.adoptIntention(intention);
-        this.currentPlan = plan;
 
-        if (intention.type === desireType.MOVE) {
             const attemptedHelp = this.beliefs.getBelief<boolean>(
                 "attemptingToHelpTeammate"
             );
 
-            if (!attemptedHelp) {
-                sendAvailabilityMessage(
-                    this.beliefs,
-                    this.api,
-                    true
-                );
+            if (!attemptedHelp && Date.now() > this.nextRequestTime && canReachDeliverySpot(this.beliefs)) {
+                // add random between RESQUEST_TIMEOUT_RANGE[0] and RESQUEST_TIMEOUT_RANGE[1], REQUEST_TIMEOUT_RANGE is an array with two numbers representing milliseconds
+                const delay =
+                    RESQUEST_TIMEOUT_RANGE[0] +
+                    Math.random() *
+                        (RESQUEST_TIMEOUT_RANGE[1] - RESQUEST_TIMEOUT_RANGE[0]);
+                // console.log(`Requesting help in ${delay}ms.`);
+
+                this.nextRequestTime = Date.now() + delay;
+                // console.log("next Request Time", this.nextRequestTime);
+                sendAvailabilityMessage(this.beliefs, this.api, true);
             }
-        } else {
-            if (
-                intention.type == desireType.DELIVER ||
-                intention.type == desireType.PICKUP
-            ) {
-                sendAvailabilityMessage(
-                    this.beliefs,
-                    this.api,
-                    false
-                );
+
+            const desires = this.desires.generateDesires(this.beliefs);
+            // const desiresTypesTeam = [desireType.EXPLORER_DELIVER, desireType.EXPLORER_MOVE, desireType.EXPLORER_PICKUP, desireType.COURIER_DELIVER, desireType.COURIER_MOVE, desireType.COURIER_PICKUP, desireType.EXPLORER_DELIVER_ON_PATH];
+            // for (const desire of desires) {
+            //     if (
+            //         desiresTypesTeam.includes(desire.type)
+            //     ) {
+            //         console.log("team desire found", desire.type," details:", desire.details);
+            //     }
+            //     if (desire.type == desireType.MOVE) {
+            //         // If the desire is to move, we need to check if we can reach a spawnable spot
+            //         console.log("Desire to move: ", desire);
+            //     }else{
+            //         console.log("Desire found: ", desire.type,);
+            //     }
+            // }
+            for (const desire of desires) {
+                console.log("Planning for desire:", desire.type, "details:", desire.details, "possibleParcels:", desire.possibleParcels);
+                const result = planFor(desire, this.beliefs);
+                if (!result) continue;
+
+                const { path: plan = [], intention = null } = result;
+
+                if (plan?.length && intention) {
+                    return this.startPlanSafely(plan, intention);
+                }
             }
+
+            //console.warn("No viable plan found, including fallback.");
         }
-        
+    }
+
+    private async startPlanSafely(
+        plan: atomicActions[],
+        intention: Intention
+    ): Promise<void> {
+        if (this.planPromise) {
+            // console.log("Plan already running, skipping new start.");
+            return;
+        }
+
+        this.planAbortSignal = false;
+        this.intentions.adoptIntention(intention);
+        this.currentPlan = plan;
+
+        if (
+            intention.type == desireType.DELIVER ||
+            intention.type == desireType.PICKUP
+        ) {
+            sendAvailabilityMessage(this.beliefs, this.api, false);
+        }
+
         this.planPromise = this.executePlan();
         try {
             await this.planPromise;
@@ -337,7 +417,6 @@ export class AgentBDI {
             this.planAbortSignal = false;
         }
     }
-    
 
     private async executePlan(): Promise<void> {
         const executor = createPlanExecutor({
@@ -350,10 +429,12 @@ export class AgentBDI {
                 getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
             maxRetries: MAX_BLOCK_RETRIES,
         });
-
+        const role = this.beliefs.getBelief<string>("role");
         try {
-            
             for await (const step of executor) {
+                if (step.action === atomicActions.drop && role === "explorer") {
+                    this.lastCollaborationTime = Date.now();
+                }
                 // console.log(
                 //     `[Plan] Executed ${step.action} with status: ${step.status}`
                 // );
@@ -379,9 +460,10 @@ export class AgentBDI {
             // }
         }
 
-        
         if (!this.planAbortSignal) {
             console.log("Plan execution completed.");
+            this.intentions.dropCurrentIntention();
+            this.stopCurrentPlan();
         }
     }
     private stopCurrentPlan(): void {

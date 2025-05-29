@@ -195,10 +195,23 @@ export function getOptimalPath(
     const mapConfig = beliefs.getBelief<MapConfig>("map")!;
     if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
+    // Get agents' positions as obstacles
     const agents = beliefs.getBelief<Agent[]>(`agents`) || [];
     const obstacles = agents
         .filter(agent => agent.x !== startPos.x || agent.y !== startPos.y)
         .map(agent => ({ x: agent.x, y: agent.y }));
+
+    // Add teammates' positions as obstacles
+    const teammatesPositions = beliefs.getBelief<Record<string, Position>>("teammatesPositions") || {};
+    for (const pos of Object.values(teammatesPositions)) {
+        if (pos.x !== startPos.x || pos.y !== startPos.y) {
+            obstacles.push({ x: pos.x, y: pos.y });
+        }
+    }
+
+    // console.log("obstacles", obstacles);
+
+
 
     try{
         const path = aStarPath(startPos, endPos, mapConfig, obstacles);
@@ -206,7 +219,7 @@ export function getOptimalPath(
     }
     catch (e) {
         if (e instanceof Error) {
-            console.error("Error in pathfinding:",e.message); // just the message, no stack trace
+            //console.error("Error in pathfinding:",e.message); // just the message, no stack trace
         } else {
             console.error(String(e)); // fallback for non-Error objects
         }

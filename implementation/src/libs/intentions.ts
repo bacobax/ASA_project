@@ -1,12 +1,13 @@
 import { BeliefBase } from "./beliefs";
 import { desireType, Intention, Parcel, Position } from "../types/types";
 import { getConfig } from "./utils/common";
-import { ManhattanDistance } from "./utils/mapUtils";
+import { manhattanDistance } from "./utils/mapUtils";
 
 export class IntentionManager {
     private activeIntention: Intention | null = null;
     private archivedIntentions: Intention[] = [];
-
+    private teamDesireTypes: desireType[] = [desireType.EXPLORER_DELIVER, desireType.COURIER_DELIVER, desireType.EXPLORER_PICKUP, desireType.COURIER_PICKUP, desireType.EXPLORER_MOVE, desireType.COURIER_MOVE, desireType.EXPLORER_DELIVER_ON_PATH];
+    
     adoptIntention(intention: Intention): void {
         if (
             this.activeIntention &&
@@ -29,12 +30,18 @@ export class IntentionManager {
 
         const intention = this.activeIntention;
 
+        const role = beliefs.getBelief<string>("role");
+        if (role == null && this.teamDesireTypes.includes(intention.type)) {
+            // If the role is not set, we cannot handle team intentions
+            this.dropCurrentIntention();
+            return;
+        }
+
         if (
             intention.type === desireType.PICKUP ||
             intention.type === desireType.EXPLORER_PICKUP ||
             intention.type === desireType.COURIER_PICKUP
         ) {
-            const agentId = beliefs.getBelief<string>("id");
             const curPos = beliefs.getBelief<Position>("position");
             const visibleParcels =
                 beliefs.getBelief<Parcel[]>("visibleParcels") ?? [];
@@ -47,7 +54,7 @@ export class IntentionManager {
                 possibleParcels?.some((parcel) => {
                     const isWithinVision =
                         curPos &&
-                        ManhattanDistance(parcel,curPos) <= visionRange;
+                        manhattanDistance(parcel,curPos) <= visionRange;
             
                     // Try to find the parcel in the current visible parcels
                     const seenParcel = visibleParcels.find((p) => p.id === parcel.id);
@@ -62,6 +69,7 @@ export class IntentionManager {
                 })
             ) {
                 this.dropCurrentIntention();
+                return;
             }
         }
 
@@ -78,19 +86,20 @@ export class IntentionManager {
             );
             if (carried.length === 0) {
                 this.dropCurrentIntention();
+                return;
             }
         }
 
         if (
             intention.type === desireType.MOVE ||
-            intention.type === desireType.EXPLORER_MOVE ||
-            intention.type === desireType.COURIER_MOVE
+            intention.type === desireType.EXPLORER_MOVE
         ) {
             const visibleParcels = beliefs
                 .getBelief<Parcel[]>("visibleParcels")
                 ?.filter((p) => p.carriedBy == null);
             if (visibleParcels?.length && visibleParcels.length > 0) {
                 this.dropCurrentIntention();
+                return;
             }
 
             const pos = beliefs.getBelief("position") as Position;
@@ -100,6 +109,7 @@ export class IntentionManager {
                 pos.y === intention.details?.targetPosition.y
             ) {
                 this.dropCurrentIntention();
+                return;
             }
         }
     }

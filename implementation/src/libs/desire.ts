@@ -4,7 +4,7 @@ import {
     considerAdditionalPickup,
     selectBestExplorationTile,
 } from "./utils/desireUtils";
-import { getDeliverySpot, ManhattanDistance } from "./utils/mapUtils";
+import { getDeliverySpot, getSpawnableSpot, manhattanDistance } from "./utils/mapUtils";
 
 /**
  * DesireGenerator class handles the generation of desires (intentions) based on the agent's beliefs
@@ -43,7 +43,7 @@ export class DesireGenerator {
         const role = beliefs.getBelief<string>("role");
 
         if (carryingParcels.length > 0) {
-            if (role != "courier") {
+            if (role != "courier" && role != "explorer") { //TO DO: add explorer role to considerAdditionalPickup
                 // Try to pick up more if possible
                 const additionalPickup = considerAdditionalPickup(
                     beliefs,
@@ -82,7 +82,7 @@ export class DesireGenerator {
                 switch (role) {
                     case "explorer":
                         const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
-                        const distanceToMidpoint = ManhattanDistance(
+                        const distanceToMidpoint = manhattanDistance(
                             curPos,
                             midpoint
                         );
@@ -93,26 +93,26 @@ export class DesireGenerator {
                             );
                             desires.push({
                                 type: desireType.EXPLORER_PICKUP,
-                                possilbeParcels: pickupCandidatesNotDroppedNearMidpoint,
+                                possibleParcels: pickupCandidatesNotDroppedNearMidpoint,
                             });
                         }else{
 
                             desires.push({
                                 type: desireType.EXPLORER_PICKUP,
-                                possilbeParcels: pickupCandidates,
+                                possibleParcels: pickupCandidates,
                             });
                         }
                         break;
                     case "courier":
                         desires.push({
                             type: desireType.COURIER_PICKUP,
-                            possilbeParcels: pickupCandidates,
+                            possibleParcels: pickupCandidates,
                         });
                         break;
                     default:
                         desires.push({
                             type: desireType.PICKUP,
-                            possilbeParcels: pickupCandidates,
+                            possibleParcels: pickupCandidates,
                         });
                         break;
                 }
@@ -129,7 +129,7 @@ export class DesireGenerator {
         if (role === "explorer") {
             let tileToExplore = selectBestExplorationTile(beliefs, curPos);
             if (!tileToExplore) {
-                tileToExplore = getDeliverySpot(curPos, 3, beliefs).position;
+                tileToExplore = getSpawnableSpot(curPos, 0, beliefs).position;
             }
 
             desires.push({
@@ -147,6 +147,9 @@ export class DesireGenerator {
             let tileToExplore = selectBestExplorationTile(beliefs, curPos);
             if (!tileToExplore) {
                 tileToExplore = getDeliverySpot(curPos, 3, beliefs).position;
+                if (!tileToExplore) {
+                    tileToExplore = getSpawnableSpot(curPos, 0, beliefs).position;
+                }
             }
             desires.push({
                 type: desireType.MOVE,

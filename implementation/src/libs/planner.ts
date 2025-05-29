@@ -20,6 +20,7 @@ import {
 } from "./plans";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { getConfig } from "./utils/common";
+import { TEST_DELAY_BETWEEN_ACTIONS } from "../config";
 
 export const planFor = (
     intention: Intention,
@@ -80,6 +81,11 @@ export async function* createPlanExecutor({
 
         while (!shouldAbort()) {
             try {
+
+                //*********************************** TEST ONLY */
+                await new Promise((resolve) => setTimeout(resolve, TEST_DELAY_BETWEEN_ACTIONS)); // test only purpose
+                //*********************************** TEST ONLY */
+
                 const success = await fn(api);
 
                 if (success) {

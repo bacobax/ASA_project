@@ -12,7 +12,7 @@ export interface IntentionDetails {
 export interface Intention {
     type: desireType;
     details?: IntentionDetails;
-    possilbeParcels?: Parcel[];
+    possibleParcels?: Parcel[];
 }
 
 export interface MapTile {

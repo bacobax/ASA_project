@@ -31,8 +31,14 @@ export function sendAvailabilityMessage(
         }
     }
     if (available) {
+        console.log(
+            `Sent availability message to teammates: ${teammatesIds.join(", ")}`
+        );
         beliefs.updateBelief("attemptingToHelpTeammate", true);
     } else {
+        console.log(
+            `Sent unavailability message to teammates`
+        );
         resetBeliefsCollaboration(beliefs);
     }
 }
@@ -42,5 +48,4 @@ export function resetBeliefsCollaboration(beliefs: BeliefBase): void {
     beliefs.updateBelief("isCollaborating", false);
     beliefs.updateBelief("midpoint", null);
     beliefs.updateBelief("role", null);
-    beliefs.updateBelief("availableTeammatePosition", null);
 }

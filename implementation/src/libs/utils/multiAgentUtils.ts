@@ -10,6 +10,8 @@ interface spawnAgentsProps {
   strategies: Strategies[];
   teamIds?: string[];
   allowedTeamIdsPrints?: string[];
+  ids: string[];
+  names?: string[];
 }
 
 interface spawnAgentProps {
@@ -19,10 +21,12 @@ interface spawnAgentProps {
   teamId: string;
   allowedPrint?: boolean;
   teammatesIds?: string[];
+  id?: string;
+  name?: string;
 }
 
 // Spawns all agents in parallel child processes
-export const spawnAgents = ({ numAgents, tokens, host, strategies, teamIds = [], allowedTeamIdsPrints=[] }: spawnAgentsProps): void => {
+export const spawnAgents = ({ numAgents, tokens, host, strategies, ids, teamIds = [], allowedTeamIdsPrints=[], names }: spawnAgentsProps): void => {
   if (teamIds.length < numAgents) {
     for (let i = teamIds.length; i < numAgents; i++) {
       teamIds.push(i + "");
@@ -52,7 +56,7 @@ export const spawnAgents = ({ numAgents, tokens, host, strategies, teamIds = [],
     else{
       for (let j = 0; j < numAgents; j++) {
           if (teamIds[j] === teamId) {
-              teammatesIds.push(tokens[j].slice(-5));
+              teammatesIds.push(ids[j]);
           }
 
       }
@@ -60,9 +64,9 @@ export const spawnAgents = ({ numAgents, tokens, host, strategies, teamIds = [],
     }
 
     // Remove the current agent from the list of teammates
-    teammatesIds = teammatesIds.filter(id => id !== token.slice(-5));
+    teammatesIds = teammatesIds.filter(id => id !== ids[i]);
 
-    console.log(`Spawning agent ${token.slice(-5)} with strategy ${strategy} in team ${teamId}, teammates: ${teammatesIds.join(', ')}`);
+    console.log(`Spawning agent ${ids[i]} with strategy ${strategy} in team ${teamId}, teammates: ${teammatesIds.join(', ')}`);
 
 
     spawnAgentProcess({
@@ -71,30 +75,56 @@ export const spawnAgents = ({ numAgents, tokens, host, strategies, teamIds = [],
       strategy,
       teamId,
       allowedPrint,
-      teammatesIds
+      teammatesIds,
+      id: ids[i],
+      name: names ? names[i] : undefined
     });
   }
 };
 
+const colors = [
+  "\x1b[31m", // red
+  "\x1b[32m", // green
+  "\x1b[33m", // yellow
+  "\x1b[34m", // blue
+  "\x1b[35m", // magenta
+  "\x1b[36m", // cyan
+  "\x1b[91m", // bright red
+  "\x1b[92m", // bright green
+  "\x1b[93m", // bright yellow
+  "\x1b[94m", // bright blue
+  "\x1b[95m", // bright magenta
+  "\x1b[96m", // bright cyan
+];
 
-const spawnAgentProcess = ({ token, host, strategy, teamId, teammatesIds = [], allowedPrint = false }: spawnAgentProps): void => {
+const resetColor = "\x1b[0m";
+
+function getColorByName(name: string): string {
+  const hash = Array.from(name).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+}
+
+
+const spawnAgentProcess = ({ token, host, strategy, teamId, teammatesIds = [], allowedPrint = false, id, name }: spawnAgentProps): void => {
   const teammatesArg = teammatesIds.join(',');
+  const displayName = name || id || "agent";
+  const color = getColorByName(displayName);
 
-  const command = `node dist/libs/utils/agentSpawn.js host="${host}" token="${token}" strategy="${strategy}" teamId="${teamId}" teammatesIds="${teammatesArg}"`;
+  const command = `node dist/libs/utils/agentSpawn.js host="${host}" token="${token}" strategy="${strategy}" teamId="${teamId}" teammatesIds="${teammatesArg}" id="${id}"`;
 
   const child = spawn(command, { shell: true });
 
   if (allowedPrint) {
     child.stdout.on('data', data => {
-      process.stdout.write(`${token.slice(-5)}: "${data.toString().trim()}"\n`);
+      process.stdout.write(`${color}${displayName}: "${data.toString().trim()}"${resetColor}\n`);
     });
 
     child.stderr.on('data', data => {
-      process.stderr.write(`${token.slice(-5)} [ERROR]: "${data.toString().trim()}"\n`);
+      process.stderr.write(`${color}${displayName} [ERROR]: "${data.toString().trim()}"${resetColor}\n`);
     });
 
     child.on('close', code => {
-      console.log(`${token.slice(-5)}: exited with code ${code}`);
+      console.log(`${color}${displayName}: exited with code ${code}${resetColor}`);
     });
   }
 };

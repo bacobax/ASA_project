@@ -12,7 +12,7 @@ import { getNearestDeliverySpot } from "./utils/desireUtils";
 import {
     getDeliverySpot,
     getNearestTile,
-    ManhattanDistance,
+    manhattanDistance,
 } from "./utils/mapUtils";
 import {
     convertPathToActions,
@@ -33,12 +33,12 @@ export function handlePickup(
     const curPos = beliefs.getBelief<Position>("position")!;
     const strategy = beliefs.getBelief<Strategies>("strategy")!;
 
-    if (!intention.possilbeParcels || intention.possilbeParcels.length === 0) {
+    if (!intention.possibleParcels || intention.possibleParcels.length === 0) {
         console.error("No parcels available for pickup");
         return { path: [], intention: intention };
     }
 
-    const sorted = intention.possilbeParcels
+    const sorted = intention.possibleParcels
         .map((p) => {
             const tilesOnPath = getOptimalPath(
                 curPos,
@@ -163,6 +163,11 @@ export function handleCourierMove(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
+    const role = beliefs.getBelief<string>("role");
+    if (role !== "courier") {
+        return { path: [], intention: intention };
+    }
+
     const midpoint = beliefs.getBelief<Position>("midpoint")!;
     const curPos = beliefs.getBelief<Position>("position")!;
 
@@ -186,6 +191,12 @@ export function handleCourierPickup(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
+    const role = beliefs.getBelief<string>("role");
+    if (role !== "courier") {
+        return { path: [], intention: intention };
+    }
+
+
     const curPos = beliefs.getBelief<Position>("position")!;
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
     const midpoint = beliefs.getBelief<Position>("midpoint")!;
@@ -227,7 +238,7 @@ export function handleCourierPickup(
     } else {
         const newIntention = {
             type: desireType.PICKUP,
-            possilbeParcels: parcels || [],
+            possibleParcels: parcels || [],
         };
         return handlePickup(newIntention, beliefs);
     }
@@ -237,6 +248,10 @@ export function handleCourierDeliver(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
+    const role = beliefs.getBelief<string>("role");
+    if (role !== "courier") {
+        return { path: [], intention: intention };
+    }
     return handleDeliver(intention, beliefs);
 }
 
@@ -244,6 +259,10 @@ export function handleExplorerMove(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
+    const role = beliefs.getBelief<string>("role");
+    if (role !== "explorer") {
+        return { path: [], intention: intention };
+    }
     return handleMove(intention, beliefs);
 }
 
@@ -251,6 +270,10 @@ export function handleExplorerPickup(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
+    const role = beliefs.getBelief<string>("role");
+    if (role !== "explorer") {
+        return { path: [], intention: intention };
+    }
     return handlePickup(intention, beliefs);
 }
 
@@ -258,17 +281,26 @@ export function handleExplorerDeliver(
     intention: Intention,
     beliefs: BeliefBase
 ): { intention: Intention; path: atomicActions[] } {
+    const role = beliefs.getBelief<string>("role");
+    if (role !== "explorer") {
+        return { path: [], intention: intention };
+    }
     const curPos = beliefs.getBelief<Position>("position")!;
     const midpoint = beliefs.getBelief<Position>("midpoint")!;
-    if (ManhattanDistance(curPos, midpoint) == 1) {
+    if (manhattanDistance(curPos, midpoint) == 1) {
         if (isTeammateAtPosition(midpoint, beliefs)) {
             // If a teammate is at the midpoint, drop the parcels
-            const parcelsCarried =
-                beliefs.getBelief<Parcel[]>("parcelsCarried") || [];
+            const parcels = beliefs.getBelief<Parcel[]>("visibleParcels") || [];
+            const parcelsCarried = parcels.filter(
+                (p) => p.carriedBy === beliefs.getBelief<string>("id")
+            );
+
             if (parcelsCarried.length > 0) {
+                console.log("Dropping parcels at midpoint", parcelsCarried);
                 return { path: [atomicActions.drop], intention: intention };
             } else {
                 // If no parcels
+                console.log("No parcels to deliver at midpoint");
                 return { path: [], intention: intention };
             }
         } else {
@@ -276,6 +308,7 @@ export function handleExplorerDeliver(
         }
     } else {
         const deliveryPos = getNearestTile(midpoint, curPos, beliefs);
+        console.log("Delivery pos", deliveryPos, " midpoint", midpoint);
         const path = convertPathToActions(
             getOptimalPath(curPos, deliveryPos, beliefs)
         );

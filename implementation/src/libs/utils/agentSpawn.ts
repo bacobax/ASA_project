@@ -8,6 +8,7 @@ interface Args {
   strategy: string;
   teamId: string;
   teammatesIds: string[];
+  id: string;
 }
 
 const argsRaw = Object.fromEntries(
@@ -24,5 +25,5 @@ const args: Args = {
 
 
 const api = new DeliverooApi(args.host, args.token);
-const agent = new AgentBDI(api, args.strategy as Strategies, args.teamId, args.teammatesIds);
+const agent = new AgentBDI(api, args.strategy as Strategies, args.teamId, args.teammatesIds, args.id);
 agent.play();
