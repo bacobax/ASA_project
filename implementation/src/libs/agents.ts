@@ -17,12 +17,18 @@ import { getConfig, sanitizeConfigs, Strategies, writeConfigs } from "./utils/co
 
 export class AgentBDI {
     private api: DeliverooApi;
+    
     private beliefs: BeliefBase = new BeliefBase();
     private desires = new DesireGenerator();
     private intentions = new IntentionManager();
+    
+    private atomicActionToApi = new Map<
+        atomicActions,
+        (api: DeliverooApi) => Promise<any>
+    >();
+
     private currentPlan: atomicActions[] = [];
-    private atomicActionToApi = new Map<atomicActions, (api: DeliverooApi) => Promise<any>>();
-    private isPlanRunning = false;
+    private planPromise: Promise<void> | null = null;
     private planAbortSignal = false;
 
     private startSemaphore = {
@@ -133,42 +139,60 @@ export class AgentBDI {
         const currentIntention = this.intentions.getCurrentIntention();
 
         if (!currentIntention || this.planAbortSignal) {
-            if (this.isPlanRunning) {
+            if (this.planPromise) {
                 this.stopCurrentPlan();
             }
-            for (const desire of this.desires.generateDesires(this.beliefs)) {
-                const { path: plan = [], intention = null } = planFor(desire, this.beliefs) ?? {};
+            const desires = this.desires.generateDesires(this.beliefs);
+    
+            for (const desire of desires) {
+                const result = planFor(desire, this.beliefs);
+                if (!result) continue;
+    
+                const { path: plan = [], intention = null } = result;
+    
                 if (plan?.length && intention) {
-                    this.intentions.adoptIntention(intention);
-                    this.currentPlan = plan;
-                    return this.executePlan();
+                    return this.startPlanSafely(plan, intention);
                 }
             }
-
+    
             console.warn("No viable plan found, including fallback.");
+        }
+    }
+    
+    private async startPlanSafely(plan: atomicActions[], intention: Intention): Promise<void> {
+        if (this.planPromise) {
+            // console.log("Plan already running, skipping new start.");
+            return;
+        }
+    
+        this.planAbortSignal = false;
+        this.intentions.adoptIntention(intention);
+        this.currentPlan = plan;
+        this.planPromise = this.executePlan();
+        try {
+            await this.planPromise;
+        } finally {
+            this.planPromise = null;
+            this.planAbortSignal = false;
         }
     
     }
-
     
 
     private async executePlan(): Promise<void> {
-        if (this.isPlanRunning) return;
-    
-        this.isPlanRunning = true;
-        this.planAbortSignal = false;
-    
+        const executor = createPlanExecutor({
+            api: this.api,
+            plan: this.currentPlan,
+            actionMap: this.atomicActionToApi,
+            isMovingAndBlocked: this.isMovingAndAgentBlocking.bind(this),
+            shouldAbort: () => this.planAbortSignal,
+            waitTimeMs:
+                getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
+            maxRetries: MAX_BLOCK_RETRIES,
+        });
+
         try {
-            const executor = createPlanExecutor({
-                api: this.api,
-                plan: this.currentPlan,
-                actionMap: this.atomicActionToApi,
-                isMovingAndBlocked: this.isMovingAndAgentBlocking.bind(this),
-                shouldAbort: () => this.planAbortSignal,
-                waitTimeMs: getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
-                maxRetries: MAX_BLOCK_RETRIES,
-            });
-    
+            
             for await (const step of executor) {
                 console.log(`[Plan] Executed ${step.action} with status: ${step.status}`);
                 this.intentions.reviseIntentions(this.beliefs);
@@ -188,22 +212,23 @@ export class AgentBDI {
                 return this.executePlan();
             }
         }
-    
-        this.isPlanRunning = false;
+
         if (!this.planAbortSignal) {
             console.log("Plan execution completed.");
         }
     }
     private stopCurrentPlan(): void {
-        console.log("Stopping plan.");
+        // console.log("Stopping plan.");
         this.planAbortSignal = true;
-        this.isPlanRunning = false;
-        this.currentPlan = [];
     }
 
-
-    private isMovingAndAgentBlocking(action: atomicActions ): boolean {
-        if(action !== atomicActions.moveDown && action!== atomicActions.moveLeft && action!== atomicActions.moveRight && action!== atomicActions.moveUp){
+    private isMovingAndAgentBlocking(action: atomicActions): boolean {
+        if (
+            action !== atomicActions.moveDown &&
+            action !== atomicActions.moveLeft &&
+            action !== atomicActions.moveRight &&
+            action !== atomicActions.moveUp
+        ) {
             return false;
         }
         const current = this.beliefs.getBelief<Position>("position");
