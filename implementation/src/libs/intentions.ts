@@ -71,8 +71,11 @@ export class IntentionManager {
             intention.type === desireType.COURIER_DELIVER ||
             intention.type === desireType.EXPLORER_DELIVER_ON_PATH
         ) {
-            const carried =
-                beliefs.getBelief<string[]>("carryingParcels") || [];
+            const parcels = beliefs.getBelief<Parcel[]>("visibleParcels") ?? [];
+            const carried = parcels.filter(
+                (p) =>
+                    p.carriedBy === beliefs.getBelief<string>("id")
+            );
             if (carried.length === 0) {
                 this.dropCurrentIntention();
             }
