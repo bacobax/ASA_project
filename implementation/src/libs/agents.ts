@@ -36,15 +36,18 @@ import {
 
 export class AgentBDI {
     private api: DeliverooApi;
+    
     private beliefs: BeliefBase = new BeliefBase();
     private desires = new DesireGenerator();
     private intentions = new IntentionManager();
-    private currentPlan: atomicActions[] = [];
+    
     private atomicActionToApi = new Map<
         atomicActions,
         (api: DeliverooApi) => Promise<any>
     >();
-    private isPlanRunning = false;
+
+    private currentPlan: atomicActions[] = [];
+    private planPromise: Promise<void> | null = null;
     private planAbortSignal = false;
 
     private startSemaphore = {
@@ -271,65 +274,85 @@ export class AgentBDI {
         const currentIntention = this.intentions.getCurrentIntention();
 
         if (!currentIntention || this.planAbortSignal) {
-            if (this.isPlanRunning) {
+            if (this.planPromise) {
                 this.stopCurrentPlan();
             }
             const desires = this.desires.generateDesires(this.beliefs);
+    
             for (const desire of desires) {
-                const { path: plan = [], intention = null } =
-                    planFor(desire, this.beliefs) ?? {};
+                const result = planFor(desire, this.beliefs);
+                if (!result) continue;
+    
+                const { path: plan = [], intention = null } = result;
+    
                 if (plan?.length && intention) {
-                    if (intention.type === desireType.MOVE) {
-                        const attemptedHelp = this.beliefs.getBelief<boolean>(
-                            "attemptingToHelpTeammate"
-                        );
-
-                        if (!attemptedHelp) {
-                            sendAvailabilityMessage(
-                                this.beliefs,
-                                this.api,
-                                true
-                            );
-                        }
-                    } else {
-                        if (
-                            intention.type == desireType.DELIVER ||
-                            intention.type == desireType.PICKUP
-                        ) {
-                            sendAvailabilityMessage(
-                                this.beliefs,
-                                this.api,
-                                false
-                            );
-                        }
-                    }
-                    this.intentions.adoptIntention(intention);
-                    this.currentPlan = plan;
-                    return this.executePlan();
+                    return this.startPlanSafely(plan, intention);
                 }
             }
-
+    
             console.warn("No viable plan found, including fallback.");
         }
     }
+    
+    private async startPlanSafely(plan: atomicActions[], intention: Intention): Promise<void> {
+        if (this.planPromise) {
+            // console.log("Plan already running, skipping new start.");
+            return;
+        }
+    
+        this.planAbortSignal = false;
+        this.intentions.adoptIntention(intention);
+        this.currentPlan = plan;
+
+        if (intention.type === desireType.MOVE) {
+            const attemptedHelp = this.beliefs.getBelief<boolean>(
+                "attemptingToHelpTeammate"
+            );
+
+            if (!attemptedHelp) {
+                sendAvailabilityMessage(
+                    this.beliefs,
+                    this.api,
+                    true
+                );
+            }
+        } else {
+            if (
+                intention.type == desireType.DELIVER ||
+                intention.type == desireType.PICKUP
+            ) {
+                sendAvailabilityMessage(
+                    this.beliefs,
+                    this.api,
+                    false
+                );
+            }
+        }
+        
+        this.planPromise = this.executePlan();
+        try {
+            await this.planPromise;
+        } finally {
+            this.planPromise = null;
+            this.planAbortSignal = false;
+        }
+    }
+    
 
     private async executePlan(): Promise<void> {
-        if (this.isPlanRunning) return;
-
-        this.isPlanRunning = true;
-        this.planAbortSignal = false;
+        const executor = createPlanExecutor({
+            api: this.api,
+            plan: this.currentPlan,
+            actionMap: this.atomicActionToApi,
+            isMovingAndBlocked: this.isMovingAndAgentBlocking.bind(this),
+            shouldAbort: () => this.planAbortSignal,
+            waitTimeMs:
+                getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
+            maxRetries: MAX_BLOCK_RETRIES,
+        });
 
         try {
-            const executor = createPlanExecutor({
-                api: this.api,
-                plan: this.currentPlan,
-                actionMap: this.atomicActionToApi,
-                isMovingAndBlocked: this.isMovingAndAgentBlocking.bind(this),
-                shouldAbort: () => this.planAbortSignal,
-                waitTimeMs:
-                    getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
-                maxRetries: MAX_BLOCK_RETRIES,
-            });
+            
             for await (const step of executor) {
                 // console.log(
                 //     `[Plan] Executed ${step.action} with status: ${step.status}`
@@ -358,13 +381,12 @@ export class AgentBDI {
 
         
         if (!this.planAbortSignal) {
-            this.isPlanRunning = false;
+            console.log("Plan execution completed.");
         }
     }
     private stopCurrentPlan(): void {
-        console.log("Stopping plan.");
+        // console.log("Stopping plan.");
         this.planAbortSignal = true;
-        this.isPlanRunning = false;
     }
 
     private isMovingAndAgentBlocking(action: atomicActions): boolean {

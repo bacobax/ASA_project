@@ -19,6 +19,7 @@ import {
     handleExplorerDeliver,
 } from "./plans";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
+import { getConfig } from "./utils/common";
 
 export const planFor = (
     intention: Intention,
@@ -86,16 +87,15 @@ export async function* createPlanExecutor({
                     break;
                 }
 
-                if (isMovingAndBlocked(action)) {
-                    if (++retries >= maxRetries) {
-                        yield { action, status: "failed" };
-                        throw new Error(`Max retries reached for ${action}`);
-                    }
-                    yield { action, status: "retrying" };
-                    await new Promise((res) => setTimeout(res, waitTimeMs));
-                    continue;
-                }
-
+                // if (isMovingAndBlocked(action)) {
+                //     if (++retries >= maxRetries) {
+                //         yield { action, status: "failed" };
+                //         throw new Error(`Max retries reached for ${action}`);
+                //     }
+                //     yield { action, status: "retrying" };
+                //     await new Promise((res) => setTimeout(res, waitTimeMs));
+                //     continue;
+                // }
                 throw new Error(`Action failed without blockage: ${action}`);
             } catch (err) {
                 throw err;
