@@ -159,6 +159,7 @@ class Agent extends ObservableMulti {
         // if still doing
         if ( this.doing ) {
             this.penalty -= this.config.PENALTY;
+            console.log("exclusivelyDo PENALTY")
             return false;
         }
         else {
@@ -186,6 +187,7 @@ class Agent extends ObservableMulti {
         }
         // console.log(this.id, 'fail move in', this.x+incr_x, this.y+incr_y)
         this.penalty -= this.config.PENALTY;
+        console.log("MOVE PENALTY")
         return false;
     }
 
