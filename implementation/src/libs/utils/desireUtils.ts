@@ -14,6 +14,7 @@ import { getConfig, Strategies } from "./common";
 import { MAX_DISTANCE_EXPLORATION } from "../../config";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { rewardNormalizations } from "./planUtils";
+import { get } from "http";
 
 export const getNearestParcel = ({
     beliefs,
@@ -140,6 +141,7 @@ function computeExplorationScores(
 ): number[][] {
     const mapTypes = beliefs.getBelief<number[][]>("mapTypes")!;
     const map = beliefs.getBelief<MapConfig>("map")!;
+    const dist = beliefs.getBelief<number[][]>("dist")!;
     const lastVisited = beliefs.getBelief<number[][]>("lastVisited")!;
     const currentPosition = beliefs.getBelief<{ x: number; y: number }>(
         "position"
@@ -182,6 +184,15 @@ function computeExplorationScores(
         for (let y = 0; y < height; y++) {
             // Skip non-traversable tiles
             if (mapTypes[x][y] !== 1) continue;
+
+            if (
+                dist[getTileIndex(currentPosition, width)][
+                    getTileIndex({ x, y }, width)
+                ] === Infinity
+            ) {
+                // Skip tiles that are not reachable
+                continue;
+            }
 
             const dx = x - currentPosition.x;
             const dy = y - currentPosition.y;
