@@ -4,6 +4,8 @@ import { pddlDomain, Strategies } from "../utils/common";
 import { atomicActions, desireType, Intention, Position, Parcel, MapConfig } from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { bestParcel } from "../plans";
+import { getDeliverySpot } from "../utils/mapUtils";
+export const tileName = (x: number, y: number) => `T${x}_${y}`;
 
 const pddlProblem = (beliefs: BeliefBase) : (intention: Intention) => PddlProblem => {
     const id = beliefs.getBelief<string>("id")!;
@@ -17,10 +19,6 @@ const pddlProblem = (beliefs: BeliefBase) : (intention: Intention) => PddlProble
 
     const me = `agent${id}`;
     const agentObj = `${me}`;
-    const tileName = (x: number, y: number) => `t${x}_${y}`;
-
-    const agentAt = `(at ${agentObj} ${tileName(pos.x, pos.y)})`;
-    const objects = [agentObj, ...allParcels.map(p => `p${p.id}`), tileName(pos.x, pos.y)].join(" ");
 
     const parcelPreds = allParcels.map(p => `(parcel p${p.id})`);
     const parcelAtPreds = allParcels.filter(p => !p.carriedBy).map(p => `(at p${p.id} ${tileName(p.x, p.y)})`);
@@ -29,47 +27,49 @@ const pddlProblem = (beliefs: BeliefBase) : (intention: Intention) => PddlProble
     const tiles = new Set<string>();
     tiles.add(tileName(pos.x, pos.y));
     allParcels.forEach(p => tiles.add(tileName(p.x, p.y)));
-    
+    map.tiles.forEach(t => tiles.add(tileName(t.x, t.y))); // ✅ Ensure all tiles are added to the set
 
     return (intention: Intention) => {
-        if (intention.position) {
-            tiles.add(tileName(intention.position.x, intention.position.y));
-        }
-    
-        const tilePreds = [...tiles].map(t => `(tile ${t})`);
-    
-        const init = [
-            `(me ${agentObj})`,
-            `(agent ${agentObj})`,
-            agentAt,
-            ...tilePreds,
-            ...parcelPreds,
-            ...parcelAtPreds,
-            ...carriedPreds
-        ].join(" ");
-    
         const desire = intention.type;
-        console.log({allParcels})
-        console.log(intention)
         let goal = "";
+    
         if (desire === desireType.PICKUP) {
-
             const targetParcel = bestParcel(intention, pos, map, beliefs, strategy);
-
-            // const targetParcel = allParcels.find(p => p.x === intention.position?.x && p.y === intention.position?.y);
             if (!targetParcel) throw new Error("Target parcel not found for PICKUP intention");
-            goal = `(carrying ${agentObj} p${targetParcel.id})`;
+            
+            tiles.add(tileName(targetParcel.x, targetParcel.y)); // ✅ Ensure tile exists
+            goal = `carrying ${agentObj} p${targetParcel.id}`;
         } else if (desire === desireType.DELIVER) {
             const targetParcel = carrying[0];
             if (!targetParcel) throw new Error("No carried parcel to deliver");
-            goal = `(and (at p${targetParcel.id} ${tileName(intention.position!.x, intention.position!.y)}))`;
+            const {position: deliveryPosition} = getDeliverySpot(pos, 0, beliefs);
+            tiles.add(tileName(deliveryPosition!.x, deliveryPosition!.y)); // ✅ Ensure delivery tile exists
+            goal = `and (at p${targetParcel.id} ${tileName(deliveryPosition!.x, deliveryPosition!.y)})`;
         } else if (desire === desireType.MOVE) {
-            goal = `(at ${agentObj} ${tileName(intention.position!.x, intention.position!.y)})`;
+            tiles.add(tileName(intention.position!.x, intention.position!.y)); // ✅ Ensure move target tile exists
+            goal = `at ${agentObj} ${tileName(intention.position!.x, intention.position!.y)}`;
         } else {
             throw new Error("Desire not implemented");
         }
+    
+        const tilePreds = [...tiles].map(t => `(tile ${t})`);
+        const objects = [agentObj, ...allParcels.map(p => `p${p.id}`), ...tiles].join(" ");
+
+        const adjacencyPreds: string[] = beliefs.getBelief<string[]>("adjacencyPreds")!;
+
+        const init = [
+            `(me ${agentObj})`,
+            `(agent ${agentObj})`,
+            `(at ${agentObj} ${tileName(pos.x, pos.y)})`,
+            ...tilePreds,
+            ...parcelPreds,
+            ...parcelAtPreds,
+            ...carriedPreds,
+            ...adjacencyPreds,
+        ].join(" ");
+    
         return new PddlProblem("deliveroo", objects, init, goal);
-    }
+    };
 };
 
 const pddlActionAtomicActionMap = {
@@ -82,10 +82,13 @@ const pddlActionAtomicActionMap = {
 }
 
 export const customOnlineSolver = async ({pddlDomain, pddlProblem} :  {pddlDomain: string, pddlProblem: string}) => {
-    return onlineSolver(pddlDomain, pddlProblem);
+    console.time("PDDL API time");
+    const result = await onlineSolver(pddlDomain, pddlProblem);
+    console.timeEnd("PDDL API time");
+    return result;
 }
 
-export const solver = async (intention: Intention, beliefs: BeliefBase): Promise<{path: atomicActions[], intention: Intention}> => {
+export const solver = async (intention: Intention, beliefs: BeliefBase): Promise<{path: atomicActions[], intention: Intention} | undefined>=> {
     const domain: string = await pddlDomain;
 
     
@@ -93,14 +96,20 @@ export const solver = async (intention: Intention, beliefs: BeliefBase): Promise
 
     const problem = pddlProblemGenerator(intention);
 
+    console.log(`Calling PDDL solver for ${intention.type}`);
+
     const plan = await customOnlineSolver({
         pddlDomain: domain,
         pddlProblem: problem.toPddlString(),
     })
 
+    if (!plan) return undefined;
+
+    console.log({plan})
+
     const atomicActions = plan.map((step: PddlPlanStep) => {
         const action = step.action;
-        return pddlActionAtomicActionMap[action as keyof typeof pddlActionAtomicActionMap];
+        return pddlActionAtomicActionMap[action.toLowerCase() as keyof typeof pddlActionAtomicActionMap];
     })
     
     return {path: atomicActions, intention};
