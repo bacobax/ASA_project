@@ -63,7 +63,7 @@ export function handlePickup(
     const bestPlanAndParcel = sorted[0];
     const bestPlan = bestPlanAndParcel.path;
 
-    if (!bestPlan) {
+    if (!bestPlan || bestPlan.length === 0) {
         console.error("Error in pathfinding");
         return { path: [], intention: intention };
     }
