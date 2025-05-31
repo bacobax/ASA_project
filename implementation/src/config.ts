@@ -38,4 +38,6 @@ export const RESQUEST_TIMEOUT_RANGE = [0, 1000]; // from 0ms to 1s
 
 export const COURIER_EXPLORATION_RANGE = 7;
 
+export const MAX_AGENT_LOGS = 4;
+
 export default config;

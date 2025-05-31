@@ -21,6 +21,7 @@ import {
 import {
     COLLABORATION_TIMEOUT,
     EXPLORATION_STEP_TOWARDS_CENTER,
+    MAX_AGENT_LOGS,
     MAX_BLOCK_RETRIES,
     RESQUEST_TIMEOUT_RANGE,
     WAIT_FOR_AGENT_MOVE_ON,
@@ -264,6 +265,9 @@ export class AgentBDI {
                     prevPosition: { x: agent.x, y: agent.y },
                     timestamp,
                 });
+                if (logs.length > MAX_AGENT_LOGS) {
+                    logs.shift(); // Keep only the last MAX_AGENT_LOGS logs
+                }
                 this.beliefs.updateBelief(agent.id, logs);
             }
         });
