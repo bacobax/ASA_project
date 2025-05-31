@@ -196,49 +196,53 @@ export function handleCourierPickup(
         return { path: [], intention: intention };
     }
 
-
     const curPos = beliefs.getBelief<Position>("position")!;
-    const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
     const midpoint = beliefs.getBelief<Position>("midpoint")!;
-    const teammateCarryingParcels =
-        beliefs.getBelief<Parcel[]>("teammateCarryingParcels") || [];
+    const possibleParcels = intention.possibleParcels || [];
+    const parcelsNearMidpoint = possibleParcels.filter(
+        (p) => p.carriedBy === null && isParcelAdajacentToPosition(midpoint, p)
+    );
 
     const parcelsLeftToPickup = [];
     let parcelsLeftPosition: Position | null = null;
-    for (const parcel of teammateCarryingParcels) {
-        if (
-            isParcelAdajacentToPosition(midpoint, parcel) &&
-            teammateCarryingParcels.includes(parcel)
-        ) {
-            if (parcelsLeftPosition == null) {
-                parcelsLeftPosition = { x: parcel.x, y: parcel.y } as Position;
-                parcelsLeftToPickup.push(parcel);
-            } else if (
-                parcelsLeftPosition.x == parcel.x ||
-                parcelsLeftPosition.y == parcel.y
-            ) {
-                parcelsLeftToPickup.push(parcel);
-            } else {
-                break;
+    if (curPos.x === midpoint.x && curPos.y === midpoint.y) {
+        for (const parcel of parcelsNearMidpoint) {
+            if (isParcelAdajacentToPosition(midpoint, parcel)) {
+                if (parcelsLeftPosition == null) {
+                    parcelsLeftPosition = {
+                        x: parcel.x,
+                        y: parcel.y,
+                    } as Position;
+                    parcelsLeftToPickup.push(parcel);
+                } else if (
+                    parcelsLeftPosition.x == parcel.x ||
+                    parcelsLeftPosition.y == parcel.y
+                ) {
+                    parcelsLeftToPickup.push(parcel);
+                }
             }
         }
     }
 
     if (parcelsLeftToPickup.length > 0) {
+        const newIntention: Intention = {
+            type: desireType.COURIER_PICKUP,
+            details: { parcelsToPickup: parcelsLeftToPickup },
+        };
         // If there are parcels left to pickup, move towards them
         const path = convertPathToActions(
             getOptimalPath(curPos, parcelsLeftPosition!, beliefs)
         );
         if (!path) {
             console.error("Error in pathfinding");
-            return { path: [], intention: intention };
+            return { path: [], intention: newIntention };
         }
         path.push(atomicActions.pickup);
-        return { path: path, intention: intention };
+        return { path: path, intention: newIntention };
     } else {
         const newIntention = {
             type: desireType.PICKUP,
-            possibleParcels: parcels || [],
+            possibleParcels: possibleParcels || [],
         };
         return handlePickup(newIntention, beliefs);
     }

@@ -137,7 +137,6 @@ export class AgentBDI {
             if (message.type === "available_to_help" && !collaborating) {
                 // A receives help availability message from B
                 if (this.needHelp()) {
-
                     this.beliefs.updateBelief("isCollaborating", true);
                     this.beliefs.updateBelief("role", "explorer");
 
@@ -160,7 +159,6 @@ export class AgentBDI {
                             },
                         })
                     );
-                    
                 } else {
                     // If we don't need help, send availability message
                     sendAvailabilityMessage(this.beliefs, this.api, false);
@@ -245,18 +243,6 @@ export class AgentBDI {
 
         this.api.onParcelsSensing((parcels) => {
             this.beliefs.updateBelief("visibleParcels", parcels);
-            const teammateIds =
-                this.beliefs.getBelief<string[]>("teammatesIds");
-            const teammateCarryingParcels = parcels.filter(
-                (p) => p.carriedBy && teammateIds?.includes(p.carriedBy)
-            );
-            if (teammateCarryingParcels.length > 0) {
-                this.beliefs.updateBelief(
-                    "teammateCarryingParcels",
-                    teammateCarryingParcels
-                );
-            }
-
             this.intentions.reviseIntentions(this.beliefs);
         });
 
@@ -313,17 +299,17 @@ export class AgentBDI {
 
     private needHelp() {
         const reachSpawnable = canReachSpawnableSpot(this.beliefs);
-        const isCollaborating = this.beliefs.getBelief<boolean>("isCollaborating");
+        const isCollaborating =
+            this.beliefs.getBelief<boolean>("isCollaborating");
         const currentIntention = this.intentions.getCurrentIntention();
-    
+
         const isMoveOrNull =
             !currentIntention || currentIntention.type !== desireType.MOVE;
-    
+
         return reachSpawnable && !isCollaborating && isMoveOrNull;
     }
 
     private async deliberate(): Promise<void> {
-        
         if (
             this.lastCollaborationTime &&
             Date.now() - this.lastCollaborationTime > COLLABORATION_TIMEOUT
@@ -347,7 +333,11 @@ export class AgentBDI {
                 "attemptingToHelpTeammate"
             );
 
-            if (!attemptedHelp && Date.now() > this.nextRequestTime && canReachDeliverySpot(this.beliefs)) {
+            if (
+                !attemptedHelp &&
+                Date.now() > this.nextRequestTime &&
+                canReachDeliverySpot(this.beliefs)
+            ) {
                 // add random between RESQUEST_TIMEOUT_RANGE[0] and RESQUEST_TIMEOUT_RANGE[1], REQUEST_TIMEOUT_RANGE is an array with two numbers representing milliseconds
                 const delay =
                     RESQUEST_TIMEOUT_RANGE[0] +
@@ -376,7 +366,14 @@ export class AgentBDI {
             //     }
             // }
             for (const desire of desires) {
-                console.log("Planning for desire:", desire.type, "details:", desire.details, "possibleParcels:", desire.possibleParcels);
+                console.log(
+                    "Planning for desire:",
+                    desire.type,
+                    "details:",
+                    desire.details,
+                    "possibleParcels:",
+                    desire.possibleParcels
+                );
                 const result = planFor(desire, this.beliefs);
                 if (!result) continue;
 
@@ -416,7 +413,6 @@ export class AgentBDI {
             await this.planPromise;
         } finally {
             this.planPromise = null;
-            this.planAbortSignal = false;
         }
     }
 
@@ -460,16 +456,14 @@ export class AgentBDI {
             //     this.currentPlan = fallback.path;
             //     return this.executePlan();
             // }
+            return;
         }
-
-        if (!this.planAbortSignal) {
-            console.log("Plan execution completed.");
-            this.intentions.dropCurrentIntention();
-            this.stopCurrentPlan();
-        }
+        console.log("Plan execution completed successfully.");
+        this.stopCurrentPlan();
     }
     private stopCurrentPlan(): void {
-        // console.log("Stopping plan.");
+        console.log("Stopping plan.");
+        this.intentions.dropCurrentIntention();
         this.planAbortSignal = true;
     }
 
