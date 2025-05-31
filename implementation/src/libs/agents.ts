@@ -34,6 +34,7 @@ import {
 import {
     resetBeliefsCollaboration,
     sendAvailabilityMessage,
+    sendIntentionUpdateMessage,
 } from "./utils/commumications";
 import {
     calculateMidpoint,
@@ -196,6 +197,14 @@ export class AgentBDI {
                     "teammatesPositions",
                     teammatesPositions
                 );
+            } else if (message.type === "intention_update") {
+                // Teammate sends their intention update
+                const teammateIntention = message.data
+                    .intentionType as desireType;
+                this.beliefs.updateBelief(
+                    "teammateIntentionType",
+                    teammateIntention
+                );
             }
         });
 
@@ -324,7 +333,7 @@ export class AgentBDI {
         const currentIntention = this.intentions.getCurrentIntention();
 
         if (!currentIntention || this.planAbortSignal) {
-            console.log("Deliberating...");
+            // console.log("Deliberating...");
             if (this.planPromise) {
                 this.stopCurrentPlan();
             }
@@ -351,29 +360,16 @@ export class AgentBDI {
             }
 
             const desires = this.desires.generateDesires(this.beliefs);
-            // const desiresTypesTeam = [desireType.EXPLORER_DELIVER, desireType.EXPLORER_MOVE, desireType.EXPLORER_PICKUP, desireType.COURIER_DELIVER, desireType.COURIER_MOVE, desireType.COURIER_PICKUP, desireType.EXPLORER_DELIVER_ON_PATH];
-            // for (const desire of desires) {
-            //     if (
-            //         desiresTypesTeam.includes(desire.type)
-            //     ) {
-            //         console.log("team desire found", desire.type," details:", desire.details);
-            //     }
-            //     if (desire.type == desireType.MOVE) {
-            //         // If the desire is to move, we need to check if we can reach a spawnable spot
-            //         console.log("Desire to move: ", desire);
-            //     }else{
-            //         console.log("Desire found: ", desire.type,);
-            //     }
-            // }
+
             for (const desire of desires) {
-                console.log(
-                    "Planning for desire:",
-                    desire.type,
-                    "details:",
-                    desire.details,
-                    "possibleParcels:",
-                    desire.possibleParcels
-                );
+                // console.log(
+                //     "Planning for desire:",
+                //     desire.type
+                //     // "details:",
+                //     // desire.details,
+                //     // "possibleParcels:",
+                //     // desire.possibleParcels
+                // );
                 const result = planFor(desire, this.beliefs);
                 if (!result) continue;
 
@@ -406,8 +402,12 @@ export class AgentBDI {
             intention.type == desireType.PICKUP
         ) {
             sendAvailabilityMessage(this.beliefs, this.api, false);
+        } else if (this.beliefs.getBelief<boolean>("isCollaborating")) {
+            sendIntentionUpdateMessage(this.api, this.beliefs, intention.type);
         }
-
+        console.log(
+            `Starting plan for intention: ${intention.type}, plan length: ${plan.length}`
+        );
         this.planPromise = this.executePlan();
         try {
             await this.planPromise;
@@ -447,22 +447,13 @@ export class AgentBDI {
 
             this.stopCurrentPlan();
 
-            // const fallback = this.intentions.getCurrentIntention()
-            //     ? planFor(this.intentions.getCurrentIntention()!, this.beliefs)
-            //     : null;
-
-            // if (fallback) {
-            //     this.intentions.adoptIntention(fallback.intention);
-            //     this.currentPlan = fallback.path;
-            //     return this.executePlan();
-            // }
             return;
         }
         console.log("Plan execution completed successfully.");
         this.stopCurrentPlan();
     }
     private stopCurrentPlan(): void {
-        console.log("Stopping plan.");
+        // console.log("Stopping plan.");
         this.intentions.dropCurrentIntention();
         this.planAbortSignal = true;
     }

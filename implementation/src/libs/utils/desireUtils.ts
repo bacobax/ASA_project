@@ -135,7 +135,8 @@ export const timeForPath = ({ path }: { path: atomicActions[] }) => {
 
 function computeExplorationScores(
     beliefs: BeliefBase,
-    maxDistance: number
+    maxDistance: number,
+    startPos: Position
 ): number[][] {
     const mapTypes = beliefs.getBelief<number[][]>("mapTypes")!;
     const map = beliefs.getBelief<MapConfig>("map")!;
@@ -143,6 +144,7 @@ function computeExplorationScores(
     const currentPosition = beliefs.getBelief<{ x: number; y: number }>(
         "position"
     )!;
+
     const visionRange = getConfig<number>("AGENTS_OBSERVATION_DISTANCE")!;
     const currentTime = Date.now();
 
@@ -152,20 +154,21 @@ function computeExplorationScores(
     const visible: boolean[][] = Array.from({ length: width }, () =>
         Array(height).fill(false)
     );
+    if (startPos.x == currentPosition.x && startPos.y == currentPosition.y) {
+        for (let dx = -visionRange; dx <= visionRange; dx++) {
+            for (let dy = -visionRange; dy <= visionRange; dy++) {
+                const nx = currentPosition.x + dx;
+                const ny = currentPosition.y + dy;
 
-    for (let dx = -visionRange; dx <= visionRange; dx++) {
-        for (let dy = -visionRange; dy <= visionRange; dy++) {
-            const nx = currentPosition.x + dx;
-            const ny = currentPosition.y + dy;
-
-            if (
-                nx >= 0 &&
-                ny >= 0 &&
-                nx < width &&
-                ny < height &&
-                Math.abs(dx) + Math.abs(dy) <= visionRange
-            ) {
-                visible[nx][ny] = true;
+                if (
+                    nx >= 0 &&
+                    ny >= 0 &&
+                    nx < width &&
+                    ny < height &&
+                    Math.abs(dx) + Math.abs(dy) <= visionRange
+                ) {
+                    visible[nx][ny] = true;
+                }
             }
         }
     }
@@ -178,7 +181,7 @@ function computeExplorationScores(
     for (let x = 0; x < width; x++) {
         for (let y = 0; y < height; y++) {
             // Skip non-traversable tiles
-            if (mapTypes[x][y] !==1) continue;
+            if (mapTypes[x][y] !== 1) continue;
 
             const dx = x - currentPosition.x;
             const dy = y - currentPosition.y;
@@ -191,13 +194,10 @@ function computeExplorationScores(
                 // Tile has never been visited — give it maximum age
                 age = Number.MAX_SAFE_INTEGER;
             } else {
-                
                 age = currentTime - lastVisited[x][y];
             }
 
-            
             scores[x][y] = age / (distance + 1); // +1 to avoid division by zero
-            
         }
     }
 
@@ -206,16 +206,14 @@ function computeExplorationScores(
 
 export function selectBestExplorationTile(
     beliefs: BeliefBase,
-    currentPos: Position
+    startPos: Position,
+    maxDistance: number = MAX_DISTANCE_EXPLORATION
 ): Position | null {
-    const scores = computeExplorationScores(
-        beliefs,
-        MAX_DISTANCE_EXPLORATION
-    );
+    const scores = computeExplorationScores(beliefs, maxDistance, startPos);
     const distances = beliefs.getBelief<number[][]>("dist")!;
     const mapWidth = scores[0].length;
 
-    const currentIndex = getTileIndex(currentPos, mapWidth);
+    const currentIndex = getTileIndex(startPos, mapWidth);
     let bestTile: Position | null = null;
     let bestScore = -1;
     let bestDist = Infinity;
@@ -244,7 +242,7 @@ export function selectBestExplorationTile(
         return null;
     }
 
-    if (bestTile.x === currentPos.x && bestTile.y === currentPos.y) {
+    if (bestTile.x === startPos.x && bestTile.y === startPos.y) {
         // console.log("Best tile is the current position, returning null");
         return null; // Don't explore the current position
     }

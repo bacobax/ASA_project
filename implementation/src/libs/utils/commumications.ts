@@ -1,6 +1,6 @@
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { BeliefBase } from "../beliefs";
-import { Position } from "../../types/types";
+import { desireType, Position } from "../../types/types";
 
 export function sendAvailabilityMessage(
     beliefs: BeliefBase,
@@ -36,9 +36,7 @@ export function sendAvailabilityMessage(
         );
         beliefs.updateBelief("attemptingToHelpTeammate", true);
     } else {
-        console.log(
-            `Sent unavailability message to teammates`
-        );
+        console.log(`Sent unavailability message to teammates`);
         resetBeliefsCollaboration(beliefs);
     }
 }
@@ -48,4 +46,33 @@ export function resetBeliefsCollaboration(beliefs: BeliefBase): void {
     beliefs.updateBelief("isCollaborating", false);
     beliefs.updateBelief("midpoint", null);
     beliefs.updateBelief("role", null);
+    beliefs.updateBelief("teammateIntentionType", null);
+}
+
+export function sendIntentionUpdateMessage(
+    api: DeliverooApi,
+    beliefs: BeliefBase,
+    intentionType: desireType
+): void {
+    const teammatesIds = beliefs.getBelief<string[]>("teammatesIds");
+    const myId = beliefs.getBelief<string>("id");
+    const myPosition = beliefs.getBelief<Position>("position");
+
+    if (!teammatesIds || !myId || !myPosition) {
+        return;
+    }
+    for (const teammateId of teammatesIds) {
+        if (teammateId !== myId) {
+            api.emitSay(
+                teammateId,
+                JSON.stringify({
+                    type: "intention_update",
+                    data: {
+                        intentionType,
+                    },
+                })
+            );
+        }
+    }
+    // console.log(`Sent intention update message: ${intentionType}`);
 }

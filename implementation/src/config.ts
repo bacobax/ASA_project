@@ -34,6 +34,8 @@ export const MAX_DISTANCE_EXPLORATION = 30;
 export const TEST_DELAY_BETWEEN_ACTIONS = 0; // TEST TIME SHOULD BE 0, only for testing purposes
 
 export const COLLABORATION_TIMEOUT = 60000; // 10 seconds
-export const RESQUEST_TIMEOUT_RANGE = [100,2000]; // from 100ms to 2s
+export const RESQUEST_TIMEOUT_RANGE = [0, 1000]; // from 0ms to 1s
+
+export const COURIER_EXPLORATION_RANGE = 7;
 
 export default config;

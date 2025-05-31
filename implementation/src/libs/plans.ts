@@ -1,3 +1,4 @@
+import { COURIER_EXPLORATION_RANGE } from "../config";
 import {
     Intention,
     atomicActions,
@@ -8,7 +9,10 @@ import {
 } from "../types/types";
 import { BeliefBase } from "./beliefs";
 import { Strategies } from "./utils/common";
-import { getNearestDeliverySpot } from "./utils/desireUtils";
+import {
+    getNearestDeliverySpot,
+    selectBestExplorationTile,
+} from "./utils/desireUtils";
 import {
     getDeliverySpot,
     getNearestTile,
@@ -170,18 +174,42 @@ export function handleCourierMove(
 
     const midpoint = beliefs.getBelief<Position>("midpoint")!;
     const curPos = beliefs.getBelief<Position>("position")!;
-
-    if (curPos.x === midpoint.x && curPos.y === midpoint.y) {
-        if (isTeammateAdjacentToPosition(midpoint, beliefs)) {
-            // If a teammate is adjacent to the midpoint, wait
-            return { path: [atomicActions.wait], intention: intention };
+    const teammateIntentionType = beliefs.getBelief<desireType>(
+        "teammateIntentionType"
+    );
+    if (teammateIntentionType === desireType.EXPLORER_DELIVER) {
+        if (curPos.x === midpoint.x && curPos.y === midpoint.y) {
+            if (isTeammateAdjacentToPosition(midpoint, beliefs)) {
+                // If a teammate is adjacent to the midpoint, wait
+                return { path: [atomicActions.wait], intention: intention };
+            } else {
+                return { path: [atomicActions.wait], intention: intention };
+            }
         } else {
-            return { path: [atomicActions.wait], intention: intention };
+            const newIntention: Intention = {
+                type: desireType.COURIER_MOVE,
+                details: { targetPosition: midpoint },
+            };
+            return handleMove(newIntention, beliefs);
         }
     } else {
+        // If the teammate is not delivering, look for tiles near the midpoint
+        let bestTileToExplore: Position | null = selectBestExplorationTile(
+            beliefs,
+            midpoint,
+            COURIER_EXPLORATION_RANGE
+        );
+        if (!bestTileToExplore) {
+            const newIntention: Intention = {
+                type: desireType.COURIER_MOVE,
+                details: { targetPosition: midpoint },
+            };
+            return handleMove(newIntention, beliefs);
+        }
+
         const newIntention: Intention = {
             type: desireType.COURIER_MOVE,
-            details: { targetPosition: midpoint },
+            details: { targetPosition: bestTileToExplore },
         };
         return handleMove(newIntention, beliefs);
     }
