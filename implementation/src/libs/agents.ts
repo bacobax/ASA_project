@@ -405,7 +405,9 @@ export class AgentBDI {
             intention.type == desireType.DELIVER ||
             intention.type == desireType.PICKUP
         ) {
-            sendAvailabilityMessage(this.beliefs, this.api, false);
+            if (!this.beliefs.getBelief<boolean>("isCollaborating")) {
+                sendAvailabilityMessage(this.beliefs, this.api, false);
+            }
         } else if (this.beliefs.getBelief<boolean>("isCollaborating")) {
             sendIntentionUpdateMessage(this.api, this.beliefs, intention.type);
         }
