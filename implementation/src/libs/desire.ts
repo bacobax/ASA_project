@@ -82,24 +82,13 @@ export class DesireGenerator {
                 switch (role) {
                     case "explorer":
                         const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
-                        const distanceToMidpoint = manhattanDistance(
-                            curPos,
-                            midpoint
-                        );
-                        if (distanceToMidpoint == 1){
-                            const pickupCandidatesNotDroppedNearMidpoint = pickupCandidates.filter(
-                                (p) =>
-                                    !(p.x === curPos.x && p.y === curPos.y)
-                            );
+                        const parcelsNotNearMidpoint = pickupCandidates.filter(
+                            (p) =>
+                                manhattanDistance(p, midpoint) > 2);
+                        if (parcelsNotNearMidpoint.length > 0) {
                             desires.push({
                                 type: desireType.EXPLORER_PICKUP,
-                                possibleParcels: pickupCandidatesNotDroppedNearMidpoint,
-                            });
-                        }else{
-
-                            desires.push({
-                                type: desireType.EXPLORER_PICKUP,
-                                possibleParcels: pickupCandidates,
+                                possibleParcels: parcelsNotNearMidpoint,
                             });
                         }
                         break;

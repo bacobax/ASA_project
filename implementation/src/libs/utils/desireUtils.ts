@@ -244,6 +244,11 @@ export function selectBestExplorationTile(
         return null;
     }
 
+    if (bestTile.x === currentPos.x && bestTile.y === currentPos.y) {
+        // console.log("Best tile is the current position, returning null");
+        return null; // Don't explore the current position
+    }
+
     // console.log(
     //     "Best tile to explore",
     //     bestTile,

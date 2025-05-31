@@ -137,8 +137,12 @@ export class AgentBDI {
             if (message.type === "available_to_help" && !collaborating) {
                 // A receives help availability message from B
                 if (this.needHelp()) {
-                    //MID POINT CALCULATION NEEDS TO BE REDONE
+
+                    this.beliefs.updateBelief("isCollaborating", true);
+                    this.beliefs.updateBelief("role", "explorer");
+
                     const midpoint = calculateMidpoint(this.beliefs);
+                    this.beliefs.updateBelief("midpoint", midpoint);
                     console.log("Midpoint calculated:", midpoint);
 
                     //TODO: EVALUATE IF WE SHOULD FINISH DELIVERING OR NOT
@@ -156,9 +160,7 @@ export class AgentBDI {
                             },
                         })
                     );
-                    this.beliefs.updateBelief("isCollaborating", true);
-                    this.beliefs.updateBelief("midpoint", midpoint);
-                    this.beliefs.updateBelief("role", "explorer");
+                    
                 } else {
                     // If we don't need help, send availability message
                     sendAvailabilityMessage(this.beliefs, this.api, false);
@@ -289,7 +291,7 @@ export class AgentBDI {
                 tiles.filter((tile) => tile.type == 2)
             );
             this.beliefs.updateBelief(
-                "spawnable",
+                "spawnables",
                 tiles.filter((tile) => tile.type == 1)
             );
 

@@ -18,83 +18,66 @@ export function getTilePosition(index: number, mapWidth: number): Position {
     return { y: Math.floor(index / mapWidth), x: index % mapWidth };
 }
 
-function isTraversable(tileType: number): boolean {
-    return tileType === 1 || tileType === 2 || tileType === 3; // 1: traversable, 2: spawnable, 3: delivery
-}
-
-/**
- * Calculates the optimal midpoint between two teammates for parcel exchange.
- * Assumes a team of 2 and calculates the midpoint once when cooperation begins.
- */
 export function calculateMidpoint(beliefs: BeliefBase): Position {
-    const selfPos = beliefs.getBelief<Position>("position");
-    const teammates = beliefs.getBelief<Record<string, Position>>("teammatesPositions");
-    const teammateId = beliefs.getBelief<string[]>("teammatesIds")?.[0]; // assume team of 2
-
-    if (!selfPos || !teammateId || !teammates?.[teammateId]) {
-        throw new Error("Missing teammate or position info.");
-    }
-
-    const teammatePos = teammates[teammateId];
-    const midX = Math.floor((selfPos.x + teammatePos.x) / 2);
-    const midY = Math.floor((selfPos.y + teammatePos.y) / 2);
-
-    const map = beliefs.getBelief<MapConfig>("map");
+    const map = beliefs.getBelief<{ width: number; height: number }>("map");
     const mapTypes = beliefs.getBelief<number[][]>("mapTypes");
-    const dist = beliefs.getBelief<number[][]>("dist") as number[][];
+    const distances = beliefs.getBelief<number[][]>("dist");
+    const spawnables: Position[] = beliefs.getBelief<Position[]>("spawnables") || [];
+    const deliveries: Position[] = beliefs.getBelief<Position[]>("deliveries") || [];
 
-    if (!map || !mapTypes || !dist) {
-        throw new Error("Map data or distance matrix missing.");
+    const role = beliefs.getBelief<string>("role");
+    const self = beliefs.getBelief<Position>("position");
+    const teammatesPositions = beliefs.getBelief<Record<string, Position>>("teammatesPositions") || {};
+    const teammate = Object.values(teammatesPositions)[0];
+
+    const courier = role === "courier" ? self : teammate;
+    const explorer = role === "explorer" ? self : teammate;
+
+    if (!map || !mapTypes || !distances || !courier || !explorer) {
+        throw new Error("Missing required beliefs.");
     }
 
-    // Precompute all spawnable positions
-    const spawnables: Position[] = [];
-    for (let x = 0; x < map.width; x++) {
-        for (let y = 0; y < map.height; y++) {
-            if (mapTypes[x][y] === 2) {
-                spawnables.push({ x, y });
+    const width = map.width;
+    const height = map.height;
+
+    const index = (p: Position) => p.y * width + p.x;
+
+    // Try every spawnable-delivery pair
+    for (const spawn of spawnables) {
+        for (const delivery of deliveries) {
+            const startIdx = index(spawn);
+            const endIdx = index(delivery);
+            const dist = distances[startIdx][endIdx];
+
+            if (dist === Infinity || dist === undefined) continue;
+
+            // Walk along the path from spawn to delivery and stop around 40-60% of the way
+            const stepsFromSpawn = Math.floor(dist * 0.4);
+
+            // Try tiles within a few steps of that point
+            for (let offset = -1; offset <= 1; offset++) {
+                const targetDist = stepsFromSpawn + offset;
+
+                for (let x = 0; x < width; x++) {
+                    for (let y = 0; y < height; y++) {
+                        const candidate = { x, y };
+                        if (mapTypes[x][y] === 0) continue;
+
+                        const d1 = distances[startIdx][index(candidate)];
+                        const d2 = distances[index(candidate)][endIdx];
+                        if (d1 + d2 === dist && d1 === targetDist) {
+                            // Ensure at least 2 tiles from any spawnable
+                            const safe = spawnables.every(sp => manhattanDistance(sp, candidate) >= 2);
+                            if (safe) return candidate;
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Utility to get tile index
-    const tileIndex = (pos: Position) => pos.y * map.width + pos.x;
-
-    let bestPos: Position = { x: midX, y: midY };
-    let minDistance = Infinity;
-
-    // Search nearby tiles around midpoint
-    const radius = 3;
-    for (let dx = -radius; dx <= radius; dx++) {
-        for (let dy = -radius; dy <= radius; dy++) {
-            const x = midX + dx;
-            const y = midY + dy;
-
-            if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
-            const tileType = mapTypes[x][y];
-            if (!isTraversable(tileType)) continue;
-
-            const currentIndex = tileIndex({ x, y });
-
-            // Ensure the tile is at least 2 path tiles away from every spawnable tile
-            const tooCloseToSpawn = spawnables.some(spawn => {
-                const spawnIndex = tileIndex(spawn);
-                return dist[currentIndex][spawnIndex] < 2;
-            });
-            if (tooCloseToSpawn) continue;
-
-            const distSelf = manhattanDistance(selfPos, { x, y });
-            const distMate = manhattanDistance(teammatePos, { x, y });
-            const totalDist = distSelf + distMate;
-
-            if (totalDist < minDistance) {
-                minDistance = totalDist;
-                bestPos = { x, y };
-            }
-        }
-    }
-
-    return bestPos;
+    // Fallback: use courier position if no good midpoint
+    return courier;
 }
 
 export function canReachDeliverySpot(beliefs: BeliefBase): boolean {
@@ -116,7 +99,7 @@ export function canReachDeliverySpot(beliefs: BeliefBase): boolean {
 export function canReachSpawnableSpot(
     beliefs: BeliefBase
 ): boolean {
-    const spawnables: MapTile[] = beliefs.getBelief("spawnable") as MapTile[];
+    const spawnables: MapTile[] = beliefs.getBelief("spawnables") as MapTile[];
     const curPos: Position = beliefs.getBelief("position") as Position;
 
     for (const spawnable of spawnables) {
@@ -163,7 +146,7 @@ export function getSpawnableSpot(
     minMovement: number,
     beliefs: BeliefBase
 ): { position: Position; distance: number } {
-    const spawnables: MapTile[] = beliefs.getBelief("spawnable") as MapTile[];
+    const spawnables: MapTile[] = beliefs.getBelief("spawnables") as MapTile[];
     const distances: number[][] = beliefs.getBelief("dist") as number[][];
     const map: MapConfig = beliefs.getBelief("map") as MapConfig;
     let minDistance: number = Infinity;
