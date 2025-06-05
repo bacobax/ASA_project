@@ -63,9 +63,19 @@ export function handlePickup(
     const bestPlanAndParcel = sorted[0];
     const bestPlan = bestPlanAndParcel.path;
 
-    if (!bestPlan || bestPlan.length === 0) {
-        console.error("Error in pathfinding");
-        return { path: [], intention: intention };
+    if (!bestPlan) {
+        console.error("Error in pathfinding: No plan found.");
+        return { path: [], intention };
+    }
+
+    if (
+        bestPlan.length === 0 &&
+        (bestPlanAndParcel.x !== curPos.x || bestPlanAndParcel.y !== curPos.y)
+    ) {
+        console.error(
+            "Error in pathfinding: Empty plan but not at destination."
+        );
+        return { path: [], intention };
     }
     const bestPlanParcel: Parcel = {
         id: bestPlanAndParcel.id,
