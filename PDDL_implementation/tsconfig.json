@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES6",                    // Target modern JavaScript
+    "module": "CommonJS",                // Use CommonJS for Node.js compatibility
+    "outDir": "dist",                    // Output compiled files to `dist/`
+    "rootDir": "src",                    // Source code is inside `src/`
+    "strict": true,                       // Enable strict type checking
+    "esModuleInterop": true,              // Allow ES module imports
+    "resolveJsonModule": true,            // Allow importing JSON files
+    "skipLibCheck": true,                 // Skip type checking of declaration files
+    "moduleResolution": "node",           // Resolve modules in a Node.js environment
+    "allowSyntheticDefaultImports": true,  // Allow `import fs from 'fs'` instead of `import * as fs from 'fs'`,
+    "allowJs": true,
+  },
+  "include": ["src",  "src/**/*.ts", "src/types/types.ts", "src/types/deliveroo-js-client.d.ts"],                     // Only compile files inside `src/`
+  "exclude": ["node_modules", "dist"]     // Ignore `node_modules` and `dist/`
+}

@@ -23,7 +23,10 @@ async function main () {
     var plan = await onlineSolver(domain, problem);
     console.log( plan );
     
-    const pddlExecutor = new PddlExecutor( { name: 'lightOn', executor: (l)=>console.log('exec lighton '+l) } );
+    const pddlExecutor = new PddlExecutor( { 
+        name: 'lightOn', 
+        executor: (l)=>console.log('exec lighton '+l) 
+    } );
     pddlExecutor.exec( plan );
 
 }
