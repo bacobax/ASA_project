@@ -1,6 +1,7 @@
 import { MapTile, MapConfig, Position, atomicActions, Agent } from "../../types/types";
 import { BeliefBase } from "../beliefs";
-
+// @ts-ignore
+import tqdm from "tqdm";
 export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const { width, height, tiles } = mapConfig;
     const numTiles = width * height;
@@ -12,7 +13,7 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const prev: number[][] = Array.from({ length: numTiles }, () => Array(numTiles).fill(-1));
     const paths: Map<number, Map<number, MapTile[]>> = new Map();
 
-    for (let y = 0; y < height; y++) {
+    for (let y of tqdm(Array(height).keys(), "Computing distances...")) {
         for (let x = 0; x < width; x++) {
             const i = y * width + x;
             paths.set(i, new Map());

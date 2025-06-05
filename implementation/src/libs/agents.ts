@@ -17,6 +17,7 @@ import {
     desireType,
     Agent,
     Parcel,
+    MapTile,
 } from "../types/types";
 import {
     COLLABORATION_TIMEOUT,
@@ -272,7 +273,7 @@ export class AgentBDI {
             }
         });
 
-        this.api.onMap((width, height, tiles) => {
+        this.api.once("map", (width: number, height: number, tiles: MapTile[]) => {
             const validTiles = tiles.filter((t) => t.type !== 0);
 
             let mapTypes = new Array(width)
@@ -293,8 +294,10 @@ export class AgentBDI {
                 "spawnables",
                 tiles.filter((tile) => tile.type == 1)
             );
-
+            console.log("Computing Floyd-Warshall algorithm...")
+            console.time("floydWarshallWithPaths");
             const { dist, prev, paths } = floydWarshallWithPaths(map);
+            console.timeEnd("floydWarshallWithPaths");
             this.beliefs.updateBelief("dist", dist);
             this.beliefs.updateBelief("prev", prev);
             this.beliefs.updateBelief("paths", paths);
@@ -337,7 +340,7 @@ export class AgentBDI {
         const currentIntention = this.intentions.getCurrentIntention();
 
         if (!currentIntention || this.planAbortSignal) {
-            // console.log("Deliberating...");
+            console.log("Deliberating...");
             if (this.planPromise) {
                 this.stopCurrentPlan();
             }
@@ -377,6 +380,8 @@ export class AgentBDI {
                 const result = planFor(desire, this.beliefs);
                 if (!result) continue;
 
+                console.log("Chosen desire:", desire);
+
                 const { path: plan = [], intention = null } = result;
 
                 if (plan?.length && intention) {
@@ -414,6 +419,7 @@ export class AgentBDI {
         console.log(
             `Starting plan for intention: ${intention.type}, plan length: ${plan.length}`
         );
+        console.log({plan})
         this.planPromise = this.executePlan();
         try {
             await this.planPromise;
