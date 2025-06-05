@@ -43,6 +43,7 @@ import {
     canReachDeliverySpot,
     canReachSpawnableSpot,
 } from "./utils/mapUtils";
+import { handleOnMessage } from "./multiAgents";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -126,89 +127,16 @@ export class AgentBDI {
         );
     }
     private setupSocketHandlers(): void {
-        this.api.onMsg(async (id, name, msg, _reply) => {
-            if (
-                !this.beliefs.getBelief<string[]>("teammatesIds")?.includes(id)
-            ) {
-                return;
-            }
-            const collaborating =
-                this.beliefs.getBelief<boolean>("isCollaborating");
-
-            const message = JSON.parse(msg) as { type: string; data: any };
-
-            if (message.type === "available_to_help" && !collaborating) {
-                // A receives help availability message from B
-                if (this.needHelp()) {
-                    this.beliefs.updateBelief("isCollaborating", true);
-                    this.beliefs.updateBelief("role", "explorer");
-
-                    const midpoint = calculateMidpoint(this.beliefs);
-                    this.beliefs.updateBelief("midpoint", midpoint);
-                    console.log("Midpoint calculated:", midpoint);
-
-                    //TODO: EVALUATE IF WE SHOULD FINISH DELIVERING OR NOT
-                    await this.stopCurrentPlan();
-
-                    console.log("i am **EXPLORER**");
-                    this.lastCollaborationTime = Date.now();
-
-                    this.api.emitSay(
-                        id,
-                        JSON.stringify({
-                            type: "help_here",
-                            data: {
-                                midpoint: midpoint,
-                            },
-                        })
-                    );
-                } else {
-                    // If we don't need help, send availability message
-                    sendAvailabilityMessage(this.beliefs, this.api, false);
-                }
-            } else if (message.type === "help_here" && !collaborating) {
-                // B receives help acceptance message from A with midpoint
-                if (
-                    this.intentions.getCurrentIntention()?.type ===
-                        desireType.MOVE ||
-                    this.intentions.getCurrentIntention() === null
-                ) {
-                    await this.stopCurrentPlan();
-                    console.log("i am **COURIER**");
-                    this.beliefs.updateBelief("isCollaborating", true);
-                    this.beliefs.updateBelief(
-                        "midpoint",
-                        message.data.midpoint
-                    );
-                    this.beliefs.updateBelief("role", "courier");
-                } else {
-                    sendAvailabilityMessage(this.beliefs, this.api, false);
-                }
-            } else if (message.type === "not_available_to_help") {
-                // Teammate is no longer available to help
-                resetBeliefsCollaboration(this.beliefs);
-            } else if (message.type === "position_update") {
-                // Teammate sends their position update
-                const newTeammatePosition = message.data.position as Position;
-                const teammatesPositions =
-                    this.beliefs.getBelief<Record<string, Position>>(
-                        "teammatesPositions"
-                    ) || {};
-                teammatesPositions[id] = newTeammatePosition;
-                this.beliefs.updateBelief(
-                    "teammatesPositions",
-                    teammatesPositions
-                );
-            } else if (message.type === "intention_update") {
-                // Teammate sends their intention update
-                const teammateIntention = message.data
-                    .intentionType as desireType;
-                this.beliefs.updateBelief(
-                    "teammateIntentionType",
-                    teammateIntention
-                );
-            }
-        });
+        this.api.onMsg(handleOnMessage({
+            beliefs: this.beliefs,
+            intentions: this.intentions,
+            api: this.api,
+            needHelp: this.needHelp.bind(this),
+            setLastCollaborationTime: (time) => {
+                this.lastCollaborationTime = time;
+            },
+            stopCurrentPlan: this.stopCurrentPlan.bind(this),
+        }));
 
         this.api.onYou((data) => {
             const position = { x: Math.round(data.x), y: Math.round(data.y) };

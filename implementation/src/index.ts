@@ -14,7 +14,7 @@ import { Strategies } from "./libs/utils/common";
 
 spawnAgents({
     // numAgents: 4,
-    numAgents: 1,
+    numAgents: 2,
     tokens: config.tokens,
     host: config.host,
     names: ["MULTI_1", "MULTI_2", "MULTI_3", "MULTI_4"],
