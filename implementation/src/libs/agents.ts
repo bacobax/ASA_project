@@ -40,12 +40,12 @@ export class AgentBDI {
     }
 
     private initActionHandlers(): void {
-        this.atomicActionToApi.set(atomicActions.moveRight, api => api.move("right"));
-        this.atomicActionToApi.set(atomicActions.moveLeft, api => api.move("left"));
-        this.atomicActionToApi.set(atomicActions.moveUp, api => api.move("up"));
-        this.atomicActionToApi.set(atomicActions.moveDown, api => api.move("down"));
-        this.atomicActionToApi.set(atomicActions.pickup, api => api.pickup());
-        this.atomicActionToApi.set(atomicActions.drop, api => api.putdown());
+        this.atomicActionToApi.set(atomicActions.moveRight, api => api.emitMove("right"));
+        this.atomicActionToApi.set(atomicActions.moveLeft, api => api.emitMove("left"));
+        this.atomicActionToApi.set(atomicActions.moveUp, api => api.emitMove("up"));
+        this.atomicActionToApi.set(atomicActions.moveDown, api => api.emitMove("down"));
+        this.atomicActionToApi.set(atomicActions.pickup, api => api.emitPickup());
+        this.atomicActionToApi.set(atomicActions.drop, api => api.emitPutdown());
         this.atomicActionToApi.set(atomicActions.wait, async _ => {
             await new Promise(res => setTimeout(res, 1000));
             return true;
