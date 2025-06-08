@@ -346,7 +346,7 @@ export function handleExplorerDeliver(
                 return { path: [], intention: intention };
             }
         } else {
-            return { path: [atomicActions.wait], intention: intention };
+            return { path: [/*atomicActions.wait*/], intention: intention };
         }
     } else {
         const deliveryPos = getNearestTile(midpoint, curPos, beliefs);

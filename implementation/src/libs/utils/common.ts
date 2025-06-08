@@ -135,3 +135,15 @@ export enum Strategies{
     aggressive = "aggressive",
     sophisticated = "sophisticated",
 }
+
+
+export const zip = <T, U>(a: T[], b: U[]): [T, U][] => {
+    if (a.length !== b.length) {
+      throw new Error("Both arrays must be of the same length");
+    }
+    if (a.length === 0) return [];
+  
+    const [firstA, ...restA] = a;
+    const [firstB, ...restB] = b;
+    return [[firstA, firstB], ...zip(restA, restB)];
+};

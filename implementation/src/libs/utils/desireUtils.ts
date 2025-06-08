@@ -10,7 +10,7 @@ import { BeliefBase } from "../beliefs";
 import { MapConfig } from "../../types/types";
 import { aStarPath, convertPathToActions, getOptimalPath } from "./pathfinding";
 import { getDeliverySpot, getMinDistance, getTileIndex } from "./mapUtils";
-import { getConfig, Strategies } from "./common";
+import { getConfig, Strategies, zip } from "./common";
 import { MAX_DISTANCE_EXPLORATION } from "../../config";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { rewardNormalizations } from "./planUtils";
@@ -325,9 +325,10 @@ export function considerAdditionalPickup(
             bestParcel = reachableParcel.parcel;
         }
     }
-    const possileParcels = reachableParcels
-        .filter((RP,idx) => gains[idx] > 0)
-        .map((RP) => RP.parcel);
+    const parcelsAndGains = zip(reachableParcels, gains);
+    const possileParcels = parcelsAndGains
+        .filter(([_, gain]) => gain > 0)
+        .map(([RP, _]) => RP.parcel);
 
     return bestParcel
         ? {

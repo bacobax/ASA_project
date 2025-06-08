@@ -88,7 +88,7 @@ export function canReachDeliverySpot(beliefs: BeliefBase): boolean {
         if(midpoint){
             deliveries.push(midpoint);
         }else{
-            console.warn("No midpoint found");
+            console.warn("canReachDeliverySpot No midpoint found");
         }
     }
     const curPos: Position = beliefs.getBelief("position") as Position;
@@ -135,7 +135,7 @@ export function getDeliverySpot(
         if(midpoint){
             deliveries.push(midpoint);
         }else{
-            console.warn("No midpoint found");
+            console.warn("explorer but no midpoint found");
         }
     }
     const distances: number[][] = beliefs.getBelief("dist") as number[][];
