@@ -82,6 +82,15 @@ export function calculateMidpoint(beliefs: BeliefBase): Position {
 
 export function canReachDeliverySpot(beliefs: BeliefBase): boolean {
     const deliveries: MapTile[] = beliefs.getBelief("deliveries") as MapTile[];
+    const role = beliefs.getBelief("role") as string;
+    if (role === "explorer") {
+        const midpoint = beliefs.getBelief<MapTile>("modipoint")
+        if(midpoint){
+            deliveries.push(midpoint);
+        }else{
+            console.warn("No midpoint found");
+        }
+    }
     const curPos: Position = beliefs.getBelief("position") as Position;
 
     for (const delivery of deliveries) {
@@ -120,6 +129,15 @@ export function getDeliverySpot(
     beliefs: BeliefBase
 ): { position: Position; distance: number } {
     const deliveries: MapTile[] = beliefs.getBelief("deliveries") as MapTile[];
+    const role = beliefs.getBelief("role") as string;
+    if (role === "explorer") {
+        const midpoint = beliefs.getBelief<MapTile>("modipoint")
+        if(midpoint){
+            deliveries.push(midpoint);
+        }else{
+            console.warn("No midpoint found");
+        }
+    }
     const distances: number[][] = beliefs.getBelief("dist") as number[][];
     const map: MapConfig = beliefs.getBelief("map") as MapConfig;
     let minDistance: number = Infinity;

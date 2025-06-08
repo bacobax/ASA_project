@@ -316,17 +316,17 @@ export function considerAdditionalPickup(
         DECAY_INTERVAL,
         carryingParcels
     );
-
+    const gains: number[] = []
     for (const reachableParcel of reachableParcels) {
         const gain = gainFunction(reachableParcel);
-
+        gains.push(gain)
         if (gain > 0 && gain > bestGain) {
             bestGain = gain;
             bestParcel = reachableParcel.parcel;
         }
     }
     const possileParcels = reachableParcels
-        .filter((RP) => gainFunction(RP) > 0)
+        .filter((RP,idx) => gains[idx] > 0)
         .map((RP) => RP.parcel);
 
     return bestParcel
