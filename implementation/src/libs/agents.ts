@@ -107,7 +107,7 @@ export class AgentBDI {
             api.emitPutdown()
         );
         this.atomicActionToApi.set(atomicActions.wait, async (_) => {
-            await new Promise((res) => setTimeout(res, 1000));
+            await new Promise((res) => setTimeout(res, this.beliefs.getBelief<number>("MOVEMENT_DURATION") || 1000));
             return true;
         });
     }

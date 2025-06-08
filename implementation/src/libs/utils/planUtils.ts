@@ -5,7 +5,7 @@ import {
     S_DISTANCE_WEIGHT,
     S_REWARD_WEIGHT,
 } from "../../config";
-import { AgentLog, Parcel, Position, atomicActions } from "../../types/types";
+import { Agent, AgentLog, Parcel, Position, atomicActions } from "../../types/types";
 import { BeliefBase } from "../beliefs";
 import { timeForPath } from "../utils/desireUtils";
 import { Strategies } from "./common";
@@ -102,6 +102,8 @@ export function isTeammateAtPosition(
     return false;
 }
 
+
+
 export function isTeammateAdjacentToPosition(
     target: Position,
     beliefs: BeliefBase
@@ -120,6 +122,16 @@ export function isTeammateAdjacentToPosition(
     }
 
     return false;
+}
+
+export function isTeammateInViewField(
+    beliefs: BeliefBase
+): boolean {
+    const visibleAgents = beliefs.getBelief<Agent[]>("agents") || [];
+    const teammatesIds = beliefs.getBelief<string[]>("teammatesIds") || [];
+    
+    // Check if any visible agent is a teammate
+    return visibleAgents.some(agent => teammatesIds.includes(agent.id));
 }
 
 export function isParcelAdajacentToPosition(

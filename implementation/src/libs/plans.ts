@@ -27,6 +27,7 @@ import {
     isParcelAdajacentToPosition,
     isTeammateAdjacentToPosition,
     isTeammateAtPosition,
+    isTeammateInViewField,
     parcelsCompare,
 } from "./utils/planUtils";
 
@@ -346,7 +347,10 @@ export function handleExplorerDeliver(
                 return { path: [], intention: intention };
             }
         } else {
-            return { path: [/*atomicActions.wait*/], intention: intention };
+            if(isTeammateInViewField(beliefs)){
+               return { path: [atomicActions.drop], intention: intention };
+            }
+            return { path: [atomicActions.wait], intention: intention };
         }
     } else {
         const deliveryPos = getNearestTile(midpoint, curPos, beliefs);

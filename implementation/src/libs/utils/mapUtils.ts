@@ -126,7 +126,8 @@ export function canReachSpawnableSpot(
 export function getDeliverySpot(
     startPos: Position,
     minMovement: number,
-    beliefs: BeliefBase
+    beliefs: BeliefBase,
+    onlyReachable: boolean = false
 ): { position: Position; distance: number } {
     const deliveries: MapTile[] = beliefs.getBelief("deliveries") as MapTile[];
     const role = beliefs.getBelief("role") as string;
@@ -144,10 +145,19 @@ export function getDeliverySpot(
     let minDistancePos;
     for (let i = 0; i < deliveries.length; i++) {
         const pos: Position = { x: deliveries[i].x, y: deliveries[i].y };
-        const dist =
-            distances[getTileIndex(startPos, map.width)][
-                getTileIndex(pos, map.width)
-            ];
+        let dist: number;
+        if(!onlyReachable){
+            dist = distances[getTileIndex(startPos, map.width)][
+                    getTileIndex(pos, map.width)
+                ];
+        }else{
+            const path = getOptimalPath(startPos, pos, beliefs);
+            if (path.length === 0){
+                dist = Infinity;
+            }else{
+                dist = path.length;
+            }
+        }
         if (dist >= minMovement && dist < minDistance) {
             minDistance = dist;
             minDistancePos = pos;
@@ -243,3 +253,9 @@ export function getNearestTile(
     }
     return nearestTile;
 }
+
+
+export const isMidpoint = (pos: Position, beliefs: BeliefBase): boolean => {
+    const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
+    return pos.x === midpoint.x && pos.y === midpoint.y;
+};

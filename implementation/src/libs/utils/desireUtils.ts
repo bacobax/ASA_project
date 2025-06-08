@@ -9,7 +9,7 @@ import {
 import { BeliefBase } from "../beliefs";
 import { MapConfig } from "../../types/types";
 import { aStarPath, convertPathToActions, getOptimalPath } from "./pathfinding";
-import { getDeliverySpot, getMinDistance, getTileIndex } from "./mapUtils";
+import { getDeliverySpot, getMinDistance, getTileIndex, isMidpoint } from "./mapUtils";
 import { getConfig, Strategies, zip } from "./common";
 import { MAX_DISTANCE_EXPLORATION } from "../../config";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
@@ -73,10 +73,12 @@ export const getNearestParcel = ({
 export const getNearestDeliverySpot = ({
     startPosition,
     beliefs,
+    onlyReachable = false,
 }: {
     startPosition: Position;
     beliefs: BeliefBase;
-}) => getDeliverySpot(startPosition, 0, beliefs);
+    onlyReachable?: boolean;
+}) => getDeliverySpot(startPosition, 0, beliefs, onlyReachable);
 
 export const getCenterDirectionTilePosition = (
     nStep: number,
@@ -277,6 +279,7 @@ export function considerAdditionalPickup(
     const DECAY_INTERVAL = getConfig<number>("PARCEL_DECADING_INTERVAL");
     const MOVEMENT_DURATION = getConfig<number>("MOVEMENT_DURATION");
     const parcels = beliefs.getBelief<Parcel[]>("visibleParcels");
+    const possibleCourierDeliverytime = estimateCourierDeliverytime(beliefs);
     const carryingParcels =
         parcels?.filter(
             (p) => p.carriedBy === beliefs.getBelief<string>("id")
@@ -291,8 +294,8 @@ export function considerAdditionalPickup(
         beliefs,
     });
 
-    const baseDeliveryTime = deliverySpot.distance * MOVEMENT_DURATION;
-    const baseDistance = deliverySpot.distance; // Assuming this is the distance from the current position to the delivery spo
+    const baseDeliveryTime = deliverySpot.distance * MOVEMENT_DURATION + (isMidpoint(deliverySpot.position, beliefs) ?  possibleCourierDeliverytime : 0);
+    const baseDistance = deliverySpot.distance +(isMidpoint(deliverySpot.position, beliefs) ? possibleCourierDeliverytime / MOVEMENT_DURATION : 0) ; // Assuming this is the distance from the current position to the delivery spo
 
     const baseReward = carryingParcels.reduce(
         (acc, p) =>
@@ -314,7 +317,8 @@ export function considerAdditionalPickup(
         beliefs,
         MOVEMENT_DURATION,
         DECAY_INTERVAL,
-        carryingParcels
+        carryingParcels,
+        possibleCourierDeliverytime
     );
     const gains: number[] = []
     for (const reachableParcel of reachableParcels) {
@@ -388,7 +392,8 @@ export const gainFromReachableParcel =
         beliefs: BeliefBase,
         MOVEMENT_DURATION: number,
         DECAY_INTERVAL: number,
-        carryingParcels: Parcel[]
+        carryingParcels: Parcel[],
+        possibleCourierDeliverytime: number
     ) =>
     ({
         parcel,
@@ -401,14 +406,14 @@ export const gainFromReachableParcel =
         });
 
         const deliverytime = delivery.distance * MOVEMENT_DURATION;
-        const totalTime = fromMeToParcelTime + deliverytime;
+        const totalTime = fromMeToParcelTime + deliverytime + (isMidpoint(delivery.position, beliefs)? possibleCourierDeliverytime : 0);
         const totalDistance = fromMeToParcelDistance + delivery.distance;
 
         const totalReward = [
             ...carryingParcels.map((p) =>
                 Math.max(0, p.reward - Math.floor(totalTime / DECAY_INTERVAL))
             ),
-            Math.max(0, baseReward - Math.floor(totalTime / DECAY_INTERVAL)),
+            Math.max(0, parcel.reward - Math.floor(totalTime / DECAY_INTERVAL)),
         ].reduce((a, b) => a + b, 0);
 
         // console.log("Parcel:", parcel.id,"Reward:", parcel.reward, "Total Reward:", totalReward, "fromMeToParcelTime:", fromMeToParcelTime, "deliveryTime:", deliverytime, "totalTime:", totalTime);
@@ -425,3 +430,16 @@ export const gainFromReachableParcel =
 
         return normalizedTotalReward - normalizedBaseReward;
     };
+
+export const estimateCourierDeliverytime = (beliefs: BeliefBase) : number => {
+    const role = beliefs.getBelief<"explorer" | "courier" | null>("role");
+    if (!role || role === "courier") return 0;
+    const midpointToNextDeliveryPoint = getNearestDeliverySpot({
+        startPosition: beliefs.getBelief<Position>("midpoint")!,
+        beliefs,
+        onlyReachable: true,
+    }).distance;
+    const deliveryTime = midpointToNextDeliveryPoint * getConfig<number>("MOVEMENT_DURATION")!;
+    return deliveryTime;
+
+}
