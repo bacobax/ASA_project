@@ -406,8 +406,9 @@ export const gainFromReachableParcel =
         });
 
         const deliverytime = delivery.distance * MOVEMENT_DURATION;
-        const totalTime = fromMeToParcelTime + deliverytime + (isMidpoint(delivery.position, beliefs)? possibleCourierDeliverytime : 0);
-        const totalDistance = fromMeToParcelDistance + delivery.distance;
+        const isMidpointDelivery = isMidpoint(delivery.position, beliefs);
+        const totalTime = fromMeToParcelTime + deliverytime + (isMidpointDelivery ? possibleCourierDeliverytime : 0);
+        const totalDistance = fromMeToParcelDistance + delivery.distance + (isMidpointDelivery ? possibleCourierDeliverytime / MOVEMENT_DURATION : 0);
 
         const totalReward = [
             ...carryingParcels.map((p) =>
