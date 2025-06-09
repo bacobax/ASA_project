@@ -107,7 +107,12 @@ export class AgentBDI {
             api.emitPutdown()
         );
         this.atomicActionToApi.set(atomicActions.wait, async (_) => {
-            await new Promise((res) => setTimeout(res, this.beliefs.getBelief<number>("MOVEMENT_DURATION") || 1000));
+            await new Promise((res) =>
+                setTimeout(
+                    res,
+                    this.beliefs.getBelief<number>("MOVEMENT_DURATION") || 1000
+                )
+            );
             return true;
         });
     }
@@ -127,16 +132,18 @@ export class AgentBDI {
         );
     }
     private setupSocketHandlers(): void {
-        this.api.onMsg(handleOnMessage({
-            beliefs: this.beliefs,
-            intentions: this.intentions,
-            api: this.api,
-            needHelp: this.needHelp.bind(this),
-            setLastCollaborationTime: (time) => {
-                this.lastCollaborationTime = time;
-            },
-            stopCurrentPlan: this.stopCurrentPlan.bind(this),
-        }));
+        this.api.onMsg(
+            handleOnMessage({
+                beliefs: this.beliefs,
+                intentions: this.intentions,
+                api: this.api,
+                needHelp: this.needHelp.bind(this),
+                setLastCollaborationTime: (time) => {
+                    this.lastCollaborationTime = time;
+                },
+                stopCurrentPlan: this.stopCurrentPlan.bind(this),
+            })
+        );
 
         this.api.onYou((data) => {
             const position = { x: Math.round(data.x), y: Math.round(data.y) };
@@ -201,37 +208,40 @@ export class AgentBDI {
             }
         });
 
-        this.api.once("map", (width: number, height: number, tiles: MapTile[]) => {
-            const validTiles = tiles.filter((t) => t.type !== 0);
+        this.api.once(
+            "map",
+            (width: number, height: number, tiles: MapTile[]) => {
+                const validTiles = tiles.filter((t) => t.type !== 0);
 
-            let mapTypes = new Array(width)
-                .fill(0)
-                .map(() => new Array(height).fill(0));
-            for (const tile of validTiles) {
-                mapTypes[tile.x][tile.y] = tile.type;
+                let mapTypes = new Array(width)
+                    .fill(0)
+                    .map(() => new Array(height).fill(0));
+                for (const tile of validTiles) {
+                    mapTypes[tile.x][tile.y] = tile.type;
+                }
+
+                const map: MapConfig = { width, height, tiles: validTiles };
+                this.beliefs.updateBelief("map", map);
+                this.beliefs.updateBelief("mapTypes", mapTypes);
+                this.beliefs.updateBelief(
+                    "deliveries",
+                    tiles.filter((tile) => tile.type == 2)
+                );
+                this.beliefs.updateBelief(
+                    "spawnables",
+                    tiles.filter((tile) => tile.type == 1)
+                );
+                console.log("Computing Floyd-Warshall algorithm...");
+                console.time("floydWarshallWithPaths");
+                const { dist, prev, paths } = floydWarshallWithPaths(map);
+                console.timeEnd("floydWarshallWithPaths");
+                this.beliefs.updateBelief("dist", dist);
+                this.beliefs.updateBelief("prev", prev);
+                this.beliefs.updateBelief("paths", paths);
+
+                this.startSemaphore.onMap = true;
             }
-
-            const map: MapConfig = { width, height, tiles: validTiles };
-            this.beliefs.updateBelief("map", map);
-            this.beliefs.updateBelief("mapTypes", mapTypes);
-            this.beliefs.updateBelief(
-                "deliveries",
-                tiles.filter((tile) => tile.type == 2)
-            );
-            this.beliefs.updateBelief(
-                "spawnables",
-                tiles.filter((tile) => tile.type == 1)
-            );
-            console.log("Computing Floyd-Warshall algorithm...")
-            console.time("floydWarshallWithPaths");
-            const { dist, prev, paths } = floydWarshallWithPaths(map);
-            console.timeEnd("floydWarshallWithPaths");
-            this.beliefs.updateBelief("dist", dist);
-            this.beliefs.updateBelief("prev", prev);
-            this.beliefs.updateBelief("paths", paths);
-
-            this.startSemaphore.onMap = true;
-        });
+        );
 
         this.api.onConfig((config) => {
             const sanitized = sanitizeConfigs(config);
@@ -347,7 +357,29 @@ export class AgentBDI {
         console.log(
             `Starting plan for intention: ${intention.type}, plan length: ${plan.length}`
         );
-        console.log({plan})
+
+        if (intention.type === desireType.PICKUP) {
+            const parcelsToPickup = intention.details
+                ?.parcelsToPickup as Parcel[];
+            if (parcelsToPickup && parcelsToPickup.length > 0) {
+                //book parcels
+                const teammatesIds =
+                    this.beliefs.getBelief<string[]>("teammatesIds") || [];
+                for (const teammateId of teammatesIds) {
+                    const parcelsIds = parcelsToPickup.map((p) => p.id);
+                    this.api.emitSay(
+                        teammateId,
+                        JSON.stringify({
+                            type: "book_parcel",
+                            data: {
+                                parcelsIds,
+                            },
+                        })
+                    );
+                }
+            }
+        }
+
         this.planPromise = this.executePlan();
         try {
             await this.planPromise;
@@ -367,6 +399,7 @@ export class AgentBDI {
                 getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
             maxRetries: MAX_BLOCK_RETRIES,
         });
+
         const role = this.beliefs.getBelief<string>("role");
         try {
             for await (const step of executor) {
@@ -394,6 +427,24 @@ export class AgentBDI {
     }
     private stopCurrentPlan(): void {
         // console.log("Stopping plan.");
+
+        const currentIntention = this.intentions.getCurrentIntention();
+        if (currentIntention?.type === desireType.PICKUP) {
+            //if dropping current intention pickup clear teammate belief of booked parcels
+            const teammatesIds =
+                this.beliefs.getBelief<string[]>("teammatesIds") || [];
+            for (const teammateId of teammatesIds) {
+                this.api.emitSay(
+                    teammateId,
+                    JSON.stringify({
+                        type: "book_parcel",
+                        data: {
+                            parcelsIds: [],
+                        },
+                    })
+                );
+            }
+        }
         this.intentions.dropCurrentIntention();
         this.planAbortSignal = true;
     }

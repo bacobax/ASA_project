@@ -4,7 +4,11 @@ import {
     considerAdditionalPickup,
     selectBestExplorationTile,
 } from "./utils/desireUtils";
-import { getDeliverySpot, getSpawnableSpot, manhattanDistance } from "./utils/mapUtils";
+import {
+    getDeliverySpot,
+    getSpawnableSpot,
+    manhattanDistance,
+} from "./utils/mapUtils";
 
 /**
  * DesireGenerator class handles the generation of desires (intentions) based on the agent's beliefs
@@ -23,9 +27,7 @@ export class DesireGenerator {
         // console.log("-----Generating Desire Options-----");
         const desires: Intention[] = [];
 
-        desires.push(
-            ...this.generateDesiresPickupDeliver(beliefs)
-        );
+        desires.push(...this.generateDesiresPickupDeliver(beliefs));
         desires.push(...this.generateDesiresMove(beliefs));
 
         return desires;
@@ -43,7 +45,7 @@ export class DesireGenerator {
         const role = beliefs.getBelief<string>("role");
 
         if (carryingParcels.length > 0) {
-            if (role != "courier") { //TO DO: add explorer role to considerAdditionalPickup
+            if (role != "courier") {
                 // Try to pick up more if possible
                 const additionalPickup = considerAdditionalPickup(
                     beliefs,
@@ -73,18 +75,23 @@ export class DesireGenerator {
             // Deliver what you're carrying
             //desires.push({ type: desireType.DELIVER });
         } else if (parcels && parcels.length > 0) {
-            // Attempt pickup of available parcels
+            const bookedParcels =
+                beliefs.getBelief<Parcel[]>("parcelsBookedByTeammates") || [];
+            // Attempt pickup of available parcels, excluding those already booked by teammates
             const pickupCandidates = parcels.filter(
                 (p) =>
-                    p.carriedBy === null
+                    p.carriedBy === null &&
+                    !bookedParcels.some((bp) => bp.id === p.id)
             );
             if (pickupCandidates.length > 0) {
                 switch (role) {
                     case "explorer":
-                        const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
+                        const midpoint = beliefs.getBelief<Position>(
+                            "midpoint"
+                        ) as Position;
                         const parcelsNotNearMidpoint = pickupCandidates.filter(
-                            (p) =>
-                                manhattanDistance(p, midpoint) > 2);
+                            (p) => manhattanDistance(p, midpoint) > 2
+                        );
                         if (parcelsNotNearMidpoint.length > 0) {
                             desires.push({
                                 type: desireType.EXPLORER_PICKUP,
@@ -137,7 +144,11 @@ export class DesireGenerator {
             if (!tileToExplore) {
                 tileToExplore = getDeliverySpot(curPos, 3, beliefs).position;
                 if (!tileToExplore) {
-                    tileToExplore = getSpawnableSpot(curPos, 0, beliefs).position;
+                    tileToExplore = getSpawnableSpot(
+                        curPos,
+                        0,
+                        beliefs
+                    ).position;
                 }
             }
             desires.push({
