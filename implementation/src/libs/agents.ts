@@ -110,7 +110,7 @@ export class AgentBDI {
             await new Promise((res) =>
                 setTimeout(
                     res,
-                    this.beliefs.getBelief<number>("MOVEMENT_DURATION") || 1000
+                    this.beliefs.getBelief<number>("MOVEMENT_DURATION")
                 )
             );
             return true;

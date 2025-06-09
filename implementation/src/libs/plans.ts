@@ -370,7 +370,7 @@ export function handleExplorerDeliver(
                     return { path: [], intention: intention };
                 }
             }
-            return { path: [atomicActions.wait], intention: intention };
+            return { path: [], intention: intention };
         }
     } else {
         const deliveryPos = getNearestTile(midpoint, curPos, beliefs);

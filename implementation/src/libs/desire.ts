@@ -45,15 +45,15 @@ export class DesireGenerator {
         const role = beliefs.getBelief<string>("role");
 
         if (carryingParcels.length > 0) {
-            if (role != "courier") {
-                // Try to pick up more if possible
-                const additionalPickup = considerAdditionalPickup(
-                    beliefs,
-                    isCollaborating
-                );
 
-                if (additionalPickup) desires.push(additionalPickup);
-            }
+            // Try to pick up more if possible
+            const additionalPickup = considerAdditionalPickup(
+                beliefs,
+                isCollaborating
+            );
+
+            if (additionalPickup) desires.push(additionalPickup);
+            
             switch (role) {
                 case "explorer":
                     desires.push({
