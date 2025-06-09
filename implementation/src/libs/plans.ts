@@ -347,8 +347,28 @@ export function handleExplorerDeliver(
                 return { path: [], intention: intention };
             }
         } else {
-            if(isTeammateInViewField(beliefs)){
-               return { path: [atomicActions.drop], intention: intention };
+            const teammateIntentionType = beliefs.getBelief<desireType>(
+                "teammateIntentionType"
+            );
+            if (
+                isTeammateInViewField(beliefs) &&
+                teammateIntentionType === desireType.COURIER_MOVE
+            ) {
+                // If a teammate is in view field and is moving towards the midpoin drop the parcels
+                const parcels =
+                    beliefs.getBelief<Parcel[]>("visibleParcels") || [];
+                const parcelsCarried = parcels.filter(
+                    (p) => p.carriedBy === beliefs.getBelief<string>("id")
+                );
+
+                if (parcelsCarried.length > 0) {
+                    console.log("Dropping parcels at midpoint", parcelsCarried);
+                    return { path: [atomicActions.drop], intention: intention };
+                } else {
+                    // If no parcels
+                    console.log("No parcels to deliver at midpoint");
+                    return { path: [], intention: intention };
+                }
             }
             return { path: [atomicActions.wait], intention: intention };
         }
