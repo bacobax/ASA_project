@@ -14,11 +14,11 @@ import { Strategies } from "./libs/utils/common";
 
 spawnAgents({
     // numAgents: 4,
-    numAgents: 2,
+    numAgents: 4,
     tokens: config.tokens,
     host: config.host,
     names: ["MULTI_1", "MULTI_2", "MULTI_3", "MULTI_4"],
-    ids: ["ab132c240d1", "b132c240d19", "MULTI_3", "MULTI_4"],
+    ids: ["ab132c240d1", "b132c240d19", "132c240d19f", "32c240d19fc"],
     strategies: [
         Strategies.sophisticated,
         Strategies.sophisticated,

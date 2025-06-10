@@ -42,33 +42,69 @@ export function calculateMidpoint(beliefs: BeliefBase): Position {
 
     const index = (p: Position) => p.y * width + p.x;
 
+    // Configuration parameters
+    const MIDPOINT_RATIO = 0.4; // Percentage along path for midpoint
+    const SAFETY_DISTANCE = 2; // Minimum distance from spawnable points
+    const SEARCH_RADIUS = 2; // Search radius around target point
+
+    let bestMidpoint: Position | null = null;
+    let bestScore = -Infinity;
+
     // Try every spawnable-delivery pair
     for (const spawn of spawnables) {
         for (const delivery of deliveries) {
             const startIdx = index(spawn);
             const endIdx = index(delivery);
-            const dist = distances[startIdx][endIdx];
+            const totalDist = distances[startIdx][endIdx];
 
-            if (dist === Infinity || dist === undefined) continue;
+            if (totalDist === Infinity || totalDist === undefined) continue;
 
-            // Walk along the path from spawn to delivery and stop around 40-60% of the way
-            const stepsFromSpawn = Math.floor(dist * 0.4);
+            const targetDist = Math.floor(totalDist * MIDPOINT_RATIO);
 
-            // Try tiles within a few steps of that point
-            for (let offset = -1; offset <= 1; offset++) {
-                const targetDist = stepsFromSpawn + offset;
+            // Search in a more focused area around the expected midpoint
+            for (let offset = -SEARCH_RADIUS; offset <= SEARCH_RADIUS; offset++) {
+                const currentTargetDist = targetDist + offset;
 
-                for (let x = 0; x < width; x++) {
-                    for (let y = 0; y < height; y++) {
-                        const candidate = { x, y };
-                        if (mapTypes[x][y] === 0) continue;
+                // Use spiral search pattern for efficiency
+                for (let radius = 0; radius <= SEARCH_RADIUS; radius++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        for (let dy = -radius; dy <= radius; dy++) {
+                            if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
 
-                        const d1 = distances[startIdx][index(candidate)];
-                        const d2 = distances[index(candidate)][endIdx];
-                        if (d1 + d2 === dist && d1 === targetDist) {
-                            // Ensure at least 2 tiles from any spawnable
-                            const safe = spawnables.every(sp => manhattanDistance(sp, candidate) >= 2);
-                            if (safe) return candidate;
+                            const x = Math.min(Math.max(spawn.x + dx, 0), width - 1);
+                            const y = Math.min(Math.max(spawn.y + dy, 0), height - 1);
+                            const candidate = { x, y };
+
+                            if (mapTypes[x][y] === 0) continue;
+
+                            const d1 = distances[startIdx][index(candidate)];
+                            const d2 = distances[index(candidate)][endIdx];
+
+                            if (d1 + d2 === totalDist && d1 === currentTargetDist) {
+                                // Calculate score based on multiple factors
+                                let score = 0;
+                                
+                                // Factor 1: Safety distance from spawnables
+                                const minSpawnDist = Math.min(...spawnables.map(sp => manhattanDistance(sp, candidate)));
+                                if (minSpawnDist < SAFETY_DISTANCE) continue;
+                                score += minSpawnDist;
+
+                                // Factor 2: Accessibility (number of walkable adjacent tiles)
+                                for (let ax = -1; ax <= 1; ax++) {
+                                    for (let ay = -1; ay <= 1; ay++) {
+                                        const adjX = x + ax;
+                                        const adjY = y + ay;
+                                        if (adjX >= 0 && adjX < width && adjY >= 0 && adjY < height && mapTypes[adjX][adjY] !== 0) {
+                                            score += 1;
+                                        }
+                                    }
+                                }
+
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bestMidpoint = candidate;
+                                }
+                            }
                         }
                     }
                 }
@@ -76,8 +112,7 @@ export function calculateMidpoint(beliefs: BeliefBase): Position {
         }
     }
 
-    // Fallback: use courier position if no good midpoint
-    return courier;
+    return bestMidpoint || courier; // Fallback to courier position if no suitable midpoint found
 }
 
 export function canReachDeliverySpot(beliefs: BeliefBase): boolean {
@@ -139,7 +174,7 @@ export function getDeliverySpot(
             console.warn("explorer but no midpoint found");
         }
     }
-    const distances: number[][] = beliefs.getBelief("dist") as number[][];
+    const distances = beliefs.getBelief<number[][]>("dist")!;
     const map: MapConfig = beliefs.getBelief("map") as MapConfig;
     let minDistance: number = Infinity;
     let minDistancePos;
@@ -257,5 +292,6 @@ export function getNearestTile(
 
 export const isMidpoint = (pos: Position, beliefs: BeliefBase): boolean => {
     const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
+    if (!midpoint) return false;
     return pos.x === midpoint.x && pos.y === midpoint.y;
 };

@@ -23,6 +23,8 @@ const args: Args = {
   teammatesIds: argsRaw.teammatesIds?.split(',') ?? [],
 } as Args;
 
+console.log({args})
+
 
 const api = new DeliverooApi(args.host, args.token);
 const agent = new AgentBDI(api, args.strategy as Strategies, args.teamId, args.teammatesIds, args.id);
