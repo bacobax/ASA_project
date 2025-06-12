@@ -17,14 +17,10 @@ import {
     desireType,
     Agent,
     Parcel,
-    MapTile,
 } from "../types/types";
 import {
-    COLLABORATION_TIMEOUT,
     EXPLORATION_STEP_TOWARDS_CENTER,
-    MAX_AGENT_LOGS,
     MAX_BLOCK_RETRIES,
-    RESQUEST_TIMEOUT_RANGE,
     WAIT_FOR_AGENT_MOVE_ON,
 } from "../config";
 import {
@@ -33,17 +29,7 @@ import {
     Strategies,
     writeConfigs,
 } from "./utils/common";
-import {
-    resetBeliefsCollaboration,
-    sendAvailabilityMessage,
-    sendIntentionUpdateMessage,
-} from "./utils/commumications";
-import {
-    calculateMidpoint,
-    canReachDeliverySpot,
-    canReachSpawnableSpot,
-} from "./utils/mapUtils";
-import { handleOnMessage } from "./multiAgents";
+import { tileName, solver } from "./PDDL/pddlExecutor";
 
 export class AgentBDI {
     private api: DeliverooApi;
@@ -59,7 +45,6 @@ export class AgentBDI {
 
     private currentPlan: atomicActions[] = [];
     private planPromise: Promise<void> | null = null;
-    private planPromise: Promise<void> | null = null;
     private planAbortSignal = false;
     private lastCollaborationTime: number | null = null;
 
@@ -74,12 +59,7 @@ export class AgentBDI {
     constructor(
         api: DeliverooApi,
         strategy: Strategies,
-        teamId: string,
-        teammatesIds: string[],
-        id: string
     ) {
-        this.beliefs.updateBelief("teamId", teamId);
-        this.beliefs.updateBelief("teammatesIds", teammatesIds);
 
         this.api = api;
         this.beliefs.updateBelief("strategy", strategy);
@@ -108,12 +88,7 @@ export class AgentBDI {
             api.emitPutdown()
         );
         this.atomicActionToApi.set(atomicActions.wait, async (_) => {
-            await new Promise((res) =>
-                setTimeout(
-                    res,
-                    this.beliefs.getBelief<number>("MOVEMENT_DURATION")
-                )
-            );
+            await new Promise((res) => setTimeout(res, 1000));
             return true;
         });
     }
@@ -129,22 +104,11 @@ export class AgentBDI {
         const movementDuration = getConfig<number>("MOVEMENT_DURATION")!;
         setInterval(
             () => this.deliberate().catch(console.error),
-            movementDuration * 2
+            movementDuration*2
         );
     }
     private setupSocketHandlers(): void {
-        this.api.onMsg(
-            handleOnMessage({
-                beliefs: this.beliefs,
-                intentions: this.intentions,
-                api: this.api,
-                needHelp: this.needHelp.bind(this),
-                setLastCollaborationTime: (time) => {
-                    this.lastCollaborationTime = time;
-                },
-                stopCurrentPlan: this.stopCurrentPlan.bind(this),
-            })
-        );
+
 
         this.api.onYou((data) => {
             const position = { x: Math.round(data.x), y: Math.round(data.y) };
@@ -167,25 +131,6 @@ export class AgentBDI {
             this.beliefs.updateBelief("id", data.id);
             this.beliefs.updateBelief("score", data.score);
             this.startSemaphore.onYou = true;
-
-            //send message to teammates with our position
-            const teammatesIds =
-                this.beliefs.getBelief<string[]>("teammatesIds");
-            if (teammatesIds && teammatesIds.length > 0) {
-                for (const teammateId of teammatesIds) {
-                    this.api.emitSay(
-                        teammateId,
-                        JSON.stringify({
-                            type: "position_update",
-                            data: {
-                                position,
-                                id: data.id,
-                                name: data.name,
-                            },
-                        })
-                    );
-                }
-            }
         });
 
         this.api.onParcelsSensing((parcels) => {
@@ -202,47 +147,60 @@ export class AgentBDI {
                     prevPosition: { x: agent.x, y: agent.y },
                     timestamp,
                 });
-                if (logs.length > MAX_AGENT_LOGS) {
-                    logs.shift(); // Keep only the last MAX_AGENT_LOGS logs
-                }
                 this.beliefs.updateBelief(agent.id, logs);
             }
         });
 
-        this.api.once(
-            "map",
-            (width: number, height: number, tiles: MapTile[]) => {
-                const validTiles = tiles.filter((t) => t.type !== 0);
+        this.api.onMap((width, height, tiles) => {
+            const validTiles = tiles.filter((t) => t.type !== 0);
 
-                let mapTypes = new Array(width)
-                    .fill(0)
-                    .map(() => new Array(height).fill(0));
-                for (const tile of validTiles) {
-                    mapTypes[tile.x][tile.y] = tile.type;
-                }
-
-                const map: MapConfig = { width, height, tiles: validTiles };
-                this.beliefs.updateBelief("map", map);
-                this.beliefs.updateBelief("mapTypes", mapTypes);
-                this.beliefs.updateBelief(
-                    "deliveries",
-                    tiles.filter((tile) => tile.type == 2)
-                );
-                this.beliefs.updateBelief(
-                    "spawnables",
-                    tiles.filter((tile) => tile.type == 1)
-                );
-                console.log("Computing Floyd-Warshall algorithm...");
-                console.time("floydWarshallWithPaths");
-                const { dist, prev, paths } = floydWarshallWithPaths(map);
-                console.timeEnd("floydWarshallWithPaths");
-                this.beliefs.updateBelief("dist", dist);
-                this.beliefs.updateBelief("prev", prev);
-                this.beliefs.updateBelief("paths", paths);
-
-                this.startSemaphore.onMap = true;
+            let mapTypes = new Array(width)
+                .fill(0)
+                .map(() => new Array(height).fill(0));
+            for (const tile of validTiles) {
+                mapTypes[tile.x][tile.y] = tile.type;
             }
-        );
+
+            const map: MapConfig = { width, height, tiles: validTiles };
+            this.beliefs.updateBelief("map", map);
+            this.beliefs.updateBelief("mapTypes", mapTypes);
+            this.beliefs.updateBelief(
+                "deliveries",
+                tiles.filter((tile) => tile.type == 2)
+            );
+            this.beliefs.updateBelief(
+                "spawnables",
+                tiles.filter((tile) => tile.type == 1)
+            );
+
+            const { dist, prev, paths } = floydWarshallWithPaths(map);
+            this.beliefs.updateBelief("dist", dist);
+            this.beliefs.updateBelief("prev", prev);
+            this.beliefs.updateBelief("paths", paths);
+
+            this.startSemaphore.onMap = true;
+
+            const adjacencyPreds: string[] = [];
+
+            for (const from of map.tiles) {
+                for (const to of map.tiles) {
+                    
+                    const fromName = tileName(from.x, from.y);
+                    const toName = tileName(to.x, to.y);
+    
+    
+                    if (from.x === to.x && from.y === to.y + 1)
+                        adjacencyPreds.push(`(down ${fromName} ${toName})`);
+                    if (from.x === to.x && from.y === to.y - 1)
+                        adjacencyPreds.push(`(up ${fromName} ${toName})`);
+                    if (from.y === to.y && from.x === to.x + 1)
+                        adjacencyPreds.push(`(left ${fromName} ${toName})`);
+                    if (from.y === to.y && from.x === to.x - 1)
+                        adjacencyPreds.push(`(right ${fromName} ${toName})`);
+                }
+            }
+            this.beliefs.updateBelief("adjacencyPreds", adjacencyPreds);
+        });
 
         this.api.onConfig((config) => {
             const sanitized = sanitizeConfigs(config);
@@ -250,33 +208,24 @@ export class AgentBDI {
             writeConfigs(sanitized);
             this.startSemaphore.onConfig = true;
         });
+
+       
+
+
     }
 
-    private needHelp() {
-        const reachSpawnable = canReachSpawnableSpot(this.beliefs);
-        const isCollaborating =
-            this.beliefs.getBelief<boolean>("isCollaborating");
-        const currentIntention = this.intentions.getCurrentIntention();
-
-        const isMoveOrNull =
-            !currentIntention || currentIntention.type !== desireType.MOVE;
-
-        return reachSpawnable && !isCollaborating && isMoveOrNull;
-    }
-
+    solverPromise: Promise<{
+        path: atomicActions[];
+        intention: Intention;
+    } | undefined> | null = null;
     private async deliberate(): Promise<void> {
-        if (
-            this.lastCollaborationTime &&
-            Date.now() - this.lastCollaborationTime > COLLABORATION_TIMEOUT
-        ) {
-            console.log("Collaboration timeout reached, resetting beliefs.");
-            sendAvailabilityMessage(this.beliefs, this.api, false);
-
-            this.lastCollaborationTime = null;
-        }
 
         this.intentions.reviseIntentions(this.beliefs);
         const currentIntention = this.intentions.getCurrentIntention();
+
+        if(this.planPromise || currentIntention || this.solverPromise){
+            return;
+        }
 
         if (!currentIntention || this.planAbortSignal) {
             console.log("Deliberating...");
@@ -284,47 +233,22 @@ export class AgentBDI {
                 this.stopCurrentPlan();
             }
 
-            const attemptedHelp = this.beliefs.getBelief<boolean>(
-                "attemptingToHelpTeammate"
-            );
-
-            if (
-                !attemptedHelp &&
-                Date.now() > this.nextRequestTime &&
-                canReachDeliverySpot(this.beliefs)
-            ) {
-                // add random between RESQUEST_TIMEOUT_RANGE[0] and RESQUEST_TIMEOUT_RANGE[1], REQUEST_TIMEOUT_RANGE is an array with two numbers representing milliseconds
-                const delay =
-                    RESQUEST_TIMEOUT_RANGE[0] +
-                    Math.random() *
-                        (RESQUEST_TIMEOUT_RANGE[1] - RESQUEST_TIMEOUT_RANGE[0]);
-                // console.log(`Requesting help in ${delay}ms.`);
-
-                this.nextRequestTime = Date.now() + delay;
-                // console.log("next Request Time", this.nextRequestTime);
-                sendAvailabilityMessage(this.beliefs, this.api, true);
-            }
-
             const desires = this.desires.generateDesires(this.beliefs);
-
+    
             for (const desire of desires) {
-                // console.log(
-                //     "Planning for desire:",
-                //     desire.type
-                //     // "details:",
-                //     // desire.details,
-                //     // "possibleParcels:",
-                //     // desire.possibleParcels
-                // );
-                const result = planFor(desire, this.beliefs);
-                if (!result) continue;
-
-                console.log("Chosen desire:", desire);
+            
+                this.solverPromise = solver(desire, this.beliefs);
+                const result = await this.solverPromise;
+                if (!result) {
+                    this.solverPromise = null;
+                    continue;
+                }
 
                 const { path: plan = [], intention = null } = result;
 
                 if (plan?.length && intention) {
-                    return this.startPlanSafely(plan, intention);
+
+                    this.solverPromise = null;
                     return this.startPlanSafely(plan, intention);
                 }
             }
@@ -346,42 +270,6 @@ export class AgentBDI {
         this.intentions.adoptIntention(intention);
         this.currentPlan = plan;
 
-        if (
-            intention.type == desireType.DELIVER ||
-            intention.type == desireType.PICKUP
-        ) {
-            if (!this.beliefs.getBelief<boolean>("isCollaborating")) {
-                sendAvailabilityMessage(this.beliefs, this.api, false);
-            }
-        } else if (this.beliefs.getBelief<boolean>("isCollaborating")) {
-            sendIntentionUpdateMessage(this.api, this.beliefs, intention.type);
-        }
-        console.log(
-            `Starting plan for intention: ${intention.type}, plan length: ${plan.length}`
-        );
-
-        if (intention.type === desireType.PICKUP) {
-            const parcelsToPickup = intention.details
-                ?.parcelsToPickup as Parcel[];
-            if (parcelsToPickup && parcelsToPickup.length > 0) {
-                //book parcels
-                const teammatesIds =
-                    this.beliefs.getBelief<string[]>("teammatesIds") || [];
-                for (const teammateId of teammatesIds) {
-                    const parcelsIds = parcelsToPickup.map((p) => p.id);
-                    this.api.emitSay(
-                        teammateId,
-                        JSON.stringify({
-                            type: "book_parcel",
-                            data: {
-                                parcelsIds,
-                            },
-                        })
-                    );
-                }
-            }
-        }
-
         this.planPromise = this.executePlan();
         try {
             await this.planPromise;
@@ -401,7 +289,6 @@ export class AgentBDI {
                 getConfig("MOVEMENT_DURATION") || WAIT_FOR_AGENT_MOVE_ON,
             maxRetries: MAX_BLOCK_RETRIES,
         });
-
         const role = this.beliefs.getBelief<string>("role");
         try {
             for await (const step of executor) {
@@ -422,31 +309,22 @@ export class AgentBDI {
 
             this.stopCurrentPlan();
 
+            // const fallback = this.intentions.getCurrentIntention()
+            //     ? planFor(this.intentions.getCurrentIntention()!, this.beliefs)
+            //     : null;
+
+            // if (fallback) {
+            //     this.intentions.adoptIntention(fallback.intention);
+            //     this.currentPlan = fallback.path;
+            //     return this.executePlan();
+            // }
             return;
         }
         console.log("Plan execution completed successfully.");
         this.stopCurrentPlan();
     }
     private stopCurrentPlan(): void {
-        // console.log("Stopping plan.");
-
-        const currentIntention = this.intentions.getCurrentIntention();
-        if (currentIntention?.type === desireType.PICKUP) {
-            //if dropping current intention pickup clear teammate belief of booked parcels
-            const teammatesIds =
-                this.beliefs.getBelief<string[]>("teammatesIds") || [];
-            for (const teammateId of teammatesIds) {
-                this.api.emitSay(
-                    teammateId,
-                    JSON.stringify({
-                        type: "book_parcel",
-                        data: {
-                            parcelsIds: [],
-                        },
-                    })
-                );
-            }
-        }
+        console.log("Stopping plan.");
         this.intentions.dropCurrentIntention();
         this.planAbortSignal = true;
     }
@@ -476,3 +354,7 @@ export class AgentBDI {
         return agents.some((a) => a.x === target.x && a.y === target.y);
     }
 }
+
+
+
+
