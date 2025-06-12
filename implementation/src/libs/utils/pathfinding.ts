@@ -1,6 +1,7 @@
 import { MapTile, MapConfig, Position, atomicActions, Agent } from "../../types/types";
 import { BeliefBase } from "../beliefs";
-
+// @ts-ignore
+import tqdm from "tqdm";
 export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const { width, height, tiles } = mapConfig;
     const numTiles = width * height;
@@ -12,7 +13,7 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const prev: number[][] = Array.from({ length: numTiles }, () => Array(numTiles).fill(-1));
     const paths: Map<number, Map<number, MapTile[]>> = new Map();
 
-    for (let y = 0; y < height; y++) {
+    for (let y of tqdm(Array(height).keys(), "Computing distances...")) {
         for (let x = 0; x < width; x++) {
             const i = y * width + x;
             paths.set(i, new Map());
@@ -190,22 +191,39 @@ export function getVisitedTilesFromPlan(startPos: Position, plan: atomicActions[
 export function getOptimalPath(
     startPos: Position,
     endPos: Position,
-    mapConfig: MapConfig,
     beliefs: BeliefBase,
 ): MapTile[]  {
+    const mapConfig = beliefs.getBelief<MapConfig>("map")!;
     if (startPos.x === endPos.x && startPos.y === endPos.y) return [];
 
+    // Get agents' positions as obstacles
     const agents = beliefs.getBelief<Agent[]>(`agents`) || [];
     const obstacles = agents
         .filter(agent => agent.x !== startPos.x || agent.y !== startPos.y)
         .map(agent => ({ x: agent.x, y: agent.y }));
+
+    // Add teammates' positions as obstacles
+    const teammatesPositions = beliefs.getBelief<Record<string, Position>>("teammatesPositions") || {};
+    for (const pos of Object.values(teammatesPositions)) {
+        if (pos.x !== startPos.x || pos.y !== startPos.y) {
+            obstacles.push({ x: pos.x, y: pos.y });
+        }
+    }
+
+    // console.log("obstacles", obstacles);
+
+
 
     try{
         const path = aStarPath(startPos, endPos, mapConfig, obstacles);
         return path;
     }
     catch (e) {
-        console.error("Error in pathfinding:", e);
+        if (e instanceof Error) {
+            //console.error("Error in pathfinding:",e.message); // just the message, no stack trace
+        } else {
+            console.error(String(e)); // fallback for non-Error objects
+        }
         return [];
     }
     

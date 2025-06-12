@@ -4,7 +4,7 @@ import * as path from 'path';
 
 interface CachedServerConfigs{
     MAP_FILE: string | undefined;
-    PARCELS_GENERATION_INTERVAL: number | undefined;
+    PARCELS_GENERATION_INTERVAL: number |  undefined;
     PARCELS_MAX: number | undefined;
     MOVEMENT_STEPS: number | undefined;
     MOVEMENT_DURATION: number | undefined;
@@ -13,7 +13,7 @@ interface CachedServerConfigs{
     AGENT_TIMEOUT: number | undefined;
     PARCEL_REWARD_AVG: number | undefined;
     PARCEL_REWARD_VARIANCE: number | undefined;
-    PARCEL_DECADING_INTERVAL: number | undefined;
+    PARCEL_DECADING_INTERVAL: number | string | undefined;
     RANDOMLY_MOVING_AGENTS: number | undefined;
     RANDOM_AGENT_SPEED: number | undefined;
     CLOCK: number | undefined;
@@ -70,6 +70,7 @@ export const sanitizeConfigs = (configs: RawServerConfig): ServerConfig => {
         RANDOM_AGENT_SPEED,
     ]
    const sanitized = toSanitize.map(prop => {
+       if (prop === "infinite") return Infinity;
        const value = parseInt(prop);
        const unit = prop.replace(/[0-9]/g, '');
        switch(unit) {
@@ -134,3 +135,15 @@ export enum Strategies{
     aggressive = "aggressive",
     sophisticated = "sophisticated",
 }
+
+
+export const zip = <T, U>(a: T[], b: U[]): [T, U][] => {
+    if (a.length !== b.length) {
+      throw new Error("Both arrays must be of the same length");
+    }
+    if (a.length === 0) return [];
+  
+    const [firstA, ...restA] = a;
+    const [firstB, ...restB] = b;
+    return [[firstA, firstB], ...zip(restA, restB)];
+};

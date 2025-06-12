@@ -13,7 +13,8 @@
     "@unitn-asa/deliveroo-js-client": "^2.0.2",
     "@unitn-asa/pddl-client": "^0.0.37",
     "node-fetch": "^3.3.0",
-    "socket.io-client": "^4.6.0"
+    "socket.io-client": "^4.6.0",
+    "tqdm": "^2.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.1",

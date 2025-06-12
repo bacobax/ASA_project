@@ -29,7 +29,15 @@ export const AGGRESSIVE_DISTANCE_WEIGHT = 1.17; // should be 1.1 < x < 1.3
 export const S_REWARD_WEIGHT = 0.7;
 export const S_DISTANCE_WEIGHT = 0.5;
 
-export const MAX_AGE_EXPLORATION = 10000;
-export const MAX_DISTANCE_EXPLORATION = 25;
+export const MAX_DISTANCE_EXPLORATION = 30;
+
+export const TEST_DELAY_BETWEEN_ACTIONS = 0; // TEST TIME SHOULD BE 0, only for testing purposes
+
+export const COLLABORATION_TIMEOUT = 60000; // 10 seconds
+export const RESQUEST_TIMEOUT_RANGE = [0, 1000]; // from 0ms to 1s
+
+export const COURIER_EXPLORATION_RANGE = 7;
+
+export const MAX_AGENT_LOGS = 4;
 
 export default config;

@@ -1,6 +1,6 @@
 declare module "@unitn-asa/deliveroo-js-client" {
     import { Intention, MapTile, MapConfig, Agent, Parcel } from "./types";
-    export class DeliverooApi /*extends EventEmitter*/ {
+    export class DeliverooApi extends EventEmitter {
         constructor(host: string, token?: string);
 
         onConnect(callback: () => void): void;
@@ -12,6 +12,16 @@ declare module "@unitn-asa/deliveroo-js-client" {
         onMap(
             callback: (width: number, height: number, tiles: MapTile[]) => void
         ): void;
+        on(
+            event: string,
+            //anyargs callback: (...args: any[]) => void
+            callback: (...args: any[]) => void
+        )
+        once(
+            event: string,
+            //anyargs callback: (...args: any[]) => void
+            callback: (...args: any[]) => void
+        )
         onYou(callback: (data: Agent) => void): void;
         onAgentsSensing(callback: (agents: Agent[]) => void): void;
         onParcelsSensing(callback: (parcels: Parcel[]) => void): void;

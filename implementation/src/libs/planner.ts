@@ -1,27 +1,52 @@
 import { BeliefBase } from "./beliefs";
-import { atomicActions, desireType, Intention ,Position, Agent, MapConfig} from "../types/types";
-import { handlePickup, handleDeliver, handleMove } from "./plans";
+import {
+    atomicActions,
+    desireType,
+    Intention,
+    Position,
+    Agent,
+    MapConfig,
+} from "../types/types";
+import {
+    handlePickup,
+    handleDeliver,
+    handleMove,
+    handleCourierDeliver,
+    handleCourierMove,
+    handleExplorerMove,
+    handleExplorerPickup,
+    handleCourierPickup,
+    handleExplorerDeliver,
+} from "./plans";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { getConfig } from "./utils/common";
+import { TEST_DELAY_BETWEEN_ACTIONS } from "../config";
 
 export const planFor = (
     intention: Intention,
     beliefs: BeliefBase
-  ): { path: atomicActions[]; intention: Intention } | undefined => {
+): { path: atomicActions[]; intention: Intention } | undefined => {
     const handlers: {
-      [key in desireType]?: (
-        intention: Intention,
-        beliefs: BeliefBase
-      ) => { path: atomicActions[]; intention: Intention };
+        [key in desireType]?: (
+            intention: Intention,
+            beliefs: BeliefBase
+        ) => { path: atomicActions[]; intention: Intention };
     } = {
-      [desireType.PICKUP]: handlePickup,
-      [desireType.DELIVER]: handleDeliver,
-      [desireType.MOVE]: handleMove,
+        [desireType.PICKUP]: handlePickup,
+        [desireType.DELIVER]: handleDeliver,
+        [desireType.MOVE]: handleMove,
+        [desireType.COURIER_DELIVER]: handleCourierDeliver,
+        [desireType.COURIER_MOVE]: handleCourierMove,
+        [desireType.COURIER_PICKUP]: handleCourierPickup,
+        [desireType.EXPLORER_DELIVER]: handleExplorerDeliver,
+        [desireType.EXPLORER_MOVE]: handleExplorerMove,
+        [desireType.EXPLORER_PICKUP]: handleExplorerPickup,
     };
-  
+
     const handler = handlers[intention.type];
     return handler ? handler(intention, beliefs) : undefined;
 };
+
 
 type PlanExecutorOptions = {
     api: DeliverooApi;
@@ -57,6 +82,12 @@ export async function* createPlanExecutor({
 
         while (!shouldAbort()) {
             try {
+                //*********************************** TEST ONLY */
+                await new Promise((resolve) =>
+                    setTimeout(resolve, TEST_DELAY_BETWEEN_ACTIONS)
+                ); // test only purpose
+                //*********************************** TEST ONLY */
+
                 const success = await fn(api);
 
                 if (success) {
@@ -64,15 +95,16 @@ export async function* createPlanExecutor({
                     break;
                 }
 
-                // if (isMovingAndBlocked(action)) {
-                //     if (++retries >= maxRetries) {
-                //         yield { action, status: "failed" };
-                //         throw new Error(`Max retries reached for ${action}`);
-                //     }
-                //     yield { action, status: "retrying" };
-                //     await new Promise((res) => setTimeout(res, waitTimeMs));
-                //     continue;
-                // }
+                if (isMovingAndBlocked(action)) {
+                    if (++retries >= maxRetries) {
+                        yield { action, status: "failed" };
+                        throw new Error(`Max retries reached for ${action}`);
+                    }
+                    yield { action, status: "retrying" };
+                    await new Promise((res) => setTimeout(res, waitTimeMs));
+                    continue;
+                }
+
                 throw new Error(`Action failed without blockage: ${action}`);
             } catch (err) {
                 throw err;
