@@ -26,19 +26,19 @@ export const WAIT_FOR_AGENT_MOVE_ON = 1000;
 /** Maximum number of retries when an agent is blocked. */
 export const MAX_BLOCK_RETRIES = 3;
 
-/** Weight factor for distance in reward calculations. */
+/** Weight factor in "linear" strategy for distance calculations. */
 export const DISTANCE_WEIGHT = 1.5;
 
-/** Weight factor for reward evaluation. */
+/** Weight factor in "linear" strategy for reward evaluation. */
 export const REWARD_WEIGHT = 1;
 
-/** Distance weight used in aggressive agent strategy (should be between 1.1 and 1.3). */
+/** Distance weight used in "aggressive" agent strategy (should be between 1.1 and 1.3). */
 export const AGGRESSIVE_DISTANCE_WEIGHT = 1.17;
 
-/** Reward weight used in specific agent strategies (e.g., support agents). */
+/** Reward weight used in "sophisticate" agent strategy (e.g., support agents). */
 export const S_REWARD_WEIGHT = 0.7;
 
-/** Distance weight used in specific agent strategies (e.g., support agents). */
+/** Distance weight used in "sophisticate" agent strategy (e.g., support agents). */
 export const S_DISTANCE_WEIGHT = 0.5;
 
 /** Maximum distance allowed for exploration behavior. */
