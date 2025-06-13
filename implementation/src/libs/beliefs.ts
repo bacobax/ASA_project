@@ -1,3 +1,6 @@
+/**
+ * Utility class handling beliefs
+ */
 export class BeliefBase {
     private beliefs: Map<string, any> = new Map();
 

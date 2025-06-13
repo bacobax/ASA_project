@@ -4,7 +4,8 @@
   "main": "node/index.js",
   "scripts": {
     "build": "tsc --build",
-    "start": "node dist/index.js $npm_config_num_agents"
+    "start": "node dist/index.js $npm_config_num_agents",
+    "docs": "typedoc"
   },
   "author": "",
   "license": "ISC",
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^22.14.1",
     "dotenv": "^16.0.3",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typedoc": "^0.28.5"
   }
 }

@@ -24,7 +24,7 @@ import {
     getVisitedTilesFromPlan,
 } from "./utils/pathfinding";
 import {
-    isParcelAdajacentToPosition,
+    isParcelAdjacentToPosition,
     isTeammateAdjacentToPosition,
     isTeammateAtPosition,
     isTeammateInViewField,
@@ -239,14 +239,14 @@ export function handleCourierPickup(
     const midpoint = beliefs.getBelief<Position>("midpoint")!;
     const possibleParcels = intention.possibleParcels || [];
     const parcelsNearMidpoint = possibleParcels.filter(
-        (p) => p.carriedBy === null && isParcelAdajacentToPosition(midpoint, p)
+        (p) => p.carriedBy === null && isParcelAdjacentToPosition(midpoint, p)
     );
 
     const parcelsLeftToPickup = [];
     let parcelsLeftPosition: Position | null = null;
     if (curPos.x === midpoint.x && curPos.y === midpoint.y) {
         for (const parcel of parcelsNearMidpoint) {
-            if (isParcelAdajacentToPosition(midpoint, parcel)) {
+            if (isParcelAdjacentToPosition(midpoint, parcel)) {
                 if (parcelsLeftPosition == null) {
                     parcelsLeftPosition = {
                         x: parcel.x,

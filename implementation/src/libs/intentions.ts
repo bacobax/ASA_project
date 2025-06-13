@@ -8,6 +8,10 @@ export class IntentionManager {
     private archivedIntentions: Intention[] = [];
     private teamDesireTypes: desireType[] = [desireType.EXPLORER_DELIVER, desireType.COURIER_DELIVER, desireType.EXPLORER_PICKUP, desireType.COURIER_PICKUP, desireType.EXPLORER_MOVE, desireType.COURIER_MOVE, desireType.EXPLORER_DELIVER_ON_PATH];
     
+    /**
+     * Sets the current active intention unless it's already the same as the current one.
+     * @param intention The intention to adopt as active.
+     */
     adoptIntention(intention: Intention): void {
         if (
             this.activeIntention &&
@@ -18,6 +22,9 @@ export class IntentionManager {
         this.activeIntention = intention;
     }
 
+    /**
+     * Archives the current active intention and clears it.
+     */
     dropCurrentIntention(): void {
         if (this.activeIntention) {
             this.archivedIntentions.push(this.activeIntention);
@@ -25,6 +32,13 @@ export class IntentionManager {
         }
     }
 
+    /**
+     * Revises the current active intention based on the agent's beliefs.
+     * Decides whether to drop the intention if conditions indicate it is no longer valid.
+     * This includes checking role availability for team intentions, parcel visibility and status,
+     * and position relative to target locations.
+     * @param beliefs The current belief base of the agent.
+     */
     reviseIntentions(beliefs: BeliefBase): void {
         if (!this.activeIntention) return;
 
@@ -114,14 +128,28 @@ export class IntentionManager {
         }
     }
 
+    /**
+     * Returns the current active intention.
+     * @returns The active Intention or null if none is active.
+     */
     getCurrentIntention(): Intention | null {
         return this.activeIntention;
     }
 
+    /**
+     * Returns true if there is an active intention.
+     * @returns boolean indicating presence of an active intention.
+     */
     hasIntentions(): boolean {
         return this.activeIntention !== null;
     }
 
+    /**
+     * Checks structural equality between two intentions.
+     * @param a First intention.
+     * @param b Second intention.
+     * @returns True if intentions are structurally equal, false otherwise.
+     */
     private areIntentionsEqual(a: Intention, b: Intention): boolean {
         return JSON.stringify(a) === JSON.stringify(b); // structural equality
     }

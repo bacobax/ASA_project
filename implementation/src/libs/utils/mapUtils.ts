@@ -115,6 +115,13 @@ export function calculateMidpoint(beliefs: BeliefBase): Position {
     return bestMidpoint || courier; // Fallback to courier position if no suitable midpoint found
 }
 
+/**
+ * Determines if the current position can reach any delivery spot.
+ * If the role is "explorer", it includes the midpoint as a delivery spot.
+ * 
+ * @param beliefs - The belief base containing map and agent information.
+ * @returns True if the current position can reach a delivery spot, false otherwise.
+ */
 export function canReachDeliverySpot(beliefs: BeliefBase): boolean {
     const deliveries: MapTile[] = beliefs.getBelief("deliveries") as MapTile[];
     const role = beliefs.getBelief("role") as string;
@@ -140,6 +147,12 @@ export function canReachDeliverySpot(beliefs: BeliefBase): boolean {
     return false; // No reachable delivery spots found
 }
 
+/**
+ * Determines if the current position can reach any spawnable spot.
+ * 
+ * @param beliefs - The belief base containing map and agent information.
+ * @returns True if the current position can reach a spawnable spot, false otherwise.
+ */
 export function canReachSpawnableSpot(
     beliefs: BeliefBase
 ): boolean {
@@ -158,6 +171,16 @@ export function canReachSpawnableSpot(
     return false; // No reachable delivery spots found
 }
 
+/**
+ * Finds a delivery spot that is at least a minimum movement distance away from the start position.
+ * If the role is "explorer", the midpoint is included as a delivery spot.
+ * 
+ * @param startPos - The starting position.
+ * @param minMovement - The minimum required distance.
+ * @param beliefs - The belief base containing map and pathfinding information.
+ * @param onlyReachable - If true, only considers spots reachable by pathfinding.
+ * @returns An object containing the position of the delivery spot and the distance to it.
+ */
 export function getDeliverySpot(
     startPos: Position,
     minMovement: number,
@@ -175,6 +198,7 @@ export function getDeliverySpot(
         }
     }
     const distances = beliefs.getBelief<number[][]>("dist")!;
+    
     const map: MapConfig = beliefs.getBelief("map") as MapConfig;
     let minDistance: number = Infinity;
     let minDistancePos;
@@ -204,6 +228,14 @@ export function getDeliverySpot(
     };
 }
 
+/**
+ * Finds a spawnable spot that is at least a minimum movement distance away from the start position.
+ * 
+ * @param startPos - The starting position.
+ * @param minMovement - The minimum required distance.
+ * @param beliefs - The belief base containing map and pathfinding information.
+ * @returns An object containing the position of the spawnable spot and the distance to it.
+ */
 export function getSpawnableSpot(
     startPos: Position,
     minMovement: number,
@@ -231,6 +263,14 @@ export function getSpawnableSpot(
     };
 }
 
+/**
+ * Retrieves the minimum distance between two positions using precomputed distances.
+ * 
+ * @param params.startPosition - The starting position.
+ * @param params.endPosition - The ending position.
+ * @param params.beliefs - The belief base containing distance and map information.
+ * @returns The minimum distance between startPosition and endPosition.
+ */
 export const getMinDistance = ({
     startPosition,
     endPosition,
@@ -247,11 +287,27 @@ export const getMinDistance = ({
     ];
 };
 
+/**
+ * Calculates the Manhattan distance between two positions.
+ * 
+ * @param pos1 - The first position.
+ * @param pos2 - The second position.
+ * @returns The Manhattan distance between pos1 and pos2.
+ */
 export function manhattanDistance(pos1: Position, pos2: Position): number {
     return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
 }
 
 //Given a target tile and the current position, find the nearest tile that is adjacent to the target tile
+
+/**
+ * Finds the nearest tile adjacent to the target tile from the current position.
+ * 
+ * @param targetTile - The target tile position.
+ * @param curPos - The current position.
+ * @param beliefs - The belief base containing distance and map information.
+ * @returns The position of the nearest adjacent tile to the target tile.
+ */
 export function getNearestTile(
     targetTile: Position,
     curPos: Position,
@@ -289,7 +345,13 @@ export function getNearestTile(
     return nearestTile;
 }
 
-
+/**
+ * Checks if a given position matches the midpoint position stored in beliefs.
+ * 
+ * @param pos - The position to check.
+ * @param beliefs - The belief base containing the midpoint information.
+ * @returns True if pos matches the midpoint, false otherwise.
+ */
 export const isMidpoint = (pos: Position, beliefs: BeliefBase): boolean => {
     const midpoint = beliefs.getBelief<Position>("midpoint") as Position;
     if (!midpoint) return false;

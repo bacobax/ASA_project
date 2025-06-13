@@ -2,6 +2,9 @@ import { ServerConfig } from "../../types/types";
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Cached server configuration values. Used to cache configuration values for performance.
+ */
 interface CachedServerConfigs{
     MAP_FILE: string | undefined;
     PARCELS_GENERATION_INTERVAL: number |  undefined;
@@ -20,6 +23,9 @@ interface CachedServerConfigs{
     BROADCAST_LOGS: boolean | undefined;
     
 }
+/**
+ * The singleton cache object for server configuration values.
+ */
 export const cachedServerConfigs: CachedServerConfigs = {
     MAP_FILE: undefined,
     PARCELS_GENERATION_INTERVAL: undefined,
@@ -39,6 +45,10 @@ export const cachedServerConfigs: CachedServerConfigs = {
 }
 
 
+/**
+ * Type representing the raw server configuration as loaded from file.
+ * Some fields are strings that need to be sanitized to appropriate types.
+ */
 export interface RawServerConfig{
     MAP_FILE: string;
     PARCELS_GENERATION_INTERVAL: string; //to sanitize
@@ -57,6 +67,12 @@ export interface RawServerConfig{
     BROADCAST_LOGS: boolean;
 }
 
+/**
+ * Converts a RawServerConfig object to a sanitized ServerConfig.
+ * Converts string values (e.g., time intervals) to numbers and handles special units.
+ * @param configs - The raw server configuration object.
+ * @returns The sanitized ServerConfig object.
+ */
 export const sanitizeConfigs = (configs: RawServerConfig): ServerConfig => {
     const {
         PARCELS_GENERATION_INTERVAL,
@@ -101,6 +117,10 @@ export const sanitizeConfigs = (configs: RawServerConfig): ServerConfig => {
    }
 }
 
+/**
+ * Writes the server configuration to a JSON file in the store directory.
+ * @param configs - The sanitized ServerConfig object to write.
+ */
 export const writeConfigs = (configs: ServerConfig) => {
    // Ensure the store directory exists
    const storeDir = path.join(__dirname, '../store');
@@ -112,6 +132,13 @@ export const writeConfigs = (configs: ServerConfig) => {
    fs.writeFileSync(configPath, JSON.stringify(configs, null, 2));
 }
 
+/**
+ * Retrieves a configuration value by key, using the cache if available.
+ * Reads from the configuration file and caches the result if not cached.
+ * @template T - The expected type of the configuration value.
+ * @param key - The configuration key.
+ * @returns The configuration value, or undefined/null if not found.
+ */
 export const getConfig = <T>(key: string): T|undefined|null => {
     const cached = cachedServerConfigs[key as keyof CachedServerConfigs];
     if (cached !== undefined) {
@@ -130,6 +157,9 @@ export const getConfig = <T>(key: string): T|undefined|null => {
 }
 
 
+/**
+ * Enum of agent strategies.
+ */
 export enum Strategies{
     linear = "linear",
     aggressive = "aggressive",
@@ -137,6 +167,15 @@ export enum Strategies{
 }
 
 
+/**
+ * Zips two arrays together into an array of pairs.
+ * Throws an error if the arrays are not of the same length.
+ * @template T - The type of elements in the first array.
+ * @template U - The type of elements in the second array.
+ * @param a - The first array.
+ * @param b - The second array.
+ * @returns An array of [T, U] pairs.
+ */
 export const zip = <T, U>(a: T[], b: U[]): [T, U][] => {
     if (a.length !== b.length) {
       throw new Error("Both arrays must be of the same length");

@@ -16,6 +16,13 @@ import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { rewardNormalizations } from "./planUtils";
 import { get } from "http";
 
+
+/**
+ * Returns the nearest parcel to the agent based on the current beliefs.
+ * @param {Object} params - The parameters.
+ * @param {BeliefBase} params.beliefs - The current belief base.
+ * @returns {{ parcel: Parcel, path: atomicActions[], time: number } | null} The nearest parcel and associated path/time, or null if none found.
+ */
 export const getNearestParcel = ({
     beliefs,
 }: {
@@ -70,6 +77,14 @@ export const getNearestParcel = ({
     };
 };
 
+/**
+ * Returns the nearest delivery spot from the given start position.
+ * @param {Object} params - The parameters.
+ * @param {Position} params.startPosition - The starting position.
+ * @param {BeliefBase} params.beliefs - The current belief base.
+ * @param {boolean} [params.onlyReachable=false] - Whether to consider only reachable spots.
+ * @returns {any} The nearest delivery spot.
+ */
 export const getNearestDeliverySpot = ({
     startPosition,
     beliefs,
@@ -80,6 +95,13 @@ export const getNearestDeliverySpot = ({
     onlyReachable?: boolean;
 }) => getDeliverySpot(startPosition, 0, beliefs, onlyReachable);
 
+/**
+ * Returns the position of the tile n steps toward the center direction.
+ * @param {number} nStep - Number of steps toward the center.
+ * @param {Position} position - The starting position.
+ * @param {BeliefBase} beliefs - The current belief base.
+ * @returns {Position} The target tile position.
+ */
 export const getCenterDirectionTilePosition = (
     nStep: number,
     position: Position,
@@ -130,12 +152,25 @@ export const getCenterDirectionTilePosition = (
     return { x: targetTile.x, y: targetTile.y };
 };
 
+/**
+ * Calculates the time required to traverse a given path.
+ * @param {Object} params - The parameters.
+ * @param {atomicActions[]} params.path - The path as a list of actions.
+ * @returns {{ time: number }} The time required for the path.
+ */
 export const timeForPath = ({ path }: { path: atomicActions[] }) => {
     const movementSpeed = getConfig<number>("MOVEMENT_DURATION");
     if (!movementSpeed) throw new Error("MOVEMENT_DURATION not found");
     return { time: path.length * movementSpeed };
 };
 
+/**
+ * Computes exploration scores for each tile based on age and distance.
+ * @param {BeliefBase} beliefs - The current belief base.
+ * @param {number} maxDistance - The maximum distance for exploration.
+ * @param {Position} startPos - The starting position.
+ * @returns {number[][]} A 2D array of exploration scores.
+ */
 function computeExplorationScores(
     beliefs: BeliefBase,
     maxDistance: number,
@@ -217,6 +252,13 @@ function computeExplorationScores(
     return scores;
 }
 
+/**
+ * Selects the best tile to explore based on exploration scores.
+ * @param {BeliefBase} beliefs - The current belief base.
+ * @param {Position} startPos - The starting position.
+ * @param {number} [maxDistance=MAX_DISTANCE_EXPLORATION] - The max distance for exploration.
+ * @returns {Position | null} The best tile to explore, or null if none found.
+ */
 export function selectBestExplorationTile(
     beliefs: BeliefBase,
     startPos: Position,
@@ -271,6 +313,12 @@ export function selectBestExplorationTile(
     return bestTile;
 }
 
+/**
+ * Considers picking up an additional parcel if beneficial.
+ * @param {BeliefBase} beliefs - The current belief base.
+ * @param {boolean} [cooperation=false] - Whether cooperation is enabled.
+ * @returns {Intention | null} The intention to pick up a parcel, or null if not beneficial.
+ */
 export function considerAdditionalPickup(
     beliefs: BeliefBase,
     cooperation: boolean = false
@@ -353,6 +401,11 @@ export interface ReachableParcelArgs {
     filter?: (parcel: Parcel) => boolean;
 }
 
+/**
+ * Returns all reachable parcels based on the current beliefs and optional filter.
+ * @param {ReachableParcelArgs} params - The parameters.
+ * @returns {ReachableParcel[]} Array of reachable parcels.
+ */
 export const getReachableParcels = ({
     beliefs,
     filter,
@@ -385,6 +438,17 @@ export const getReachableParcels = ({
     return reachable;
 };
 
+/**
+ * Returns a function that computes the gain from picking up a reachable parcel.
+ * @param {number} baseReward - The base reward.
+ * @param {number} baseDistance - The base distance.
+ * @param {BeliefBase} beliefs - The current belief base.
+ * @param {number} MOVEMENT_DURATION - Movement duration.
+ * @param {number} DECAY_INTERVAL - Parcel decay interval.
+ * @param {Parcel[]} carryingParcels - Parcels currently being carried.
+ * @param {number} possibleCourierDeliverytime - Estimated courier delivery time.
+ * @returns {(ReachableParcel) => number} Function to compute gain for a reachable parcel.
+ */
 export const gainFromReachableParcel =
     (
         baseReward: number,
@@ -432,6 +496,11 @@ export const gainFromReachableParcel =
         return normalizedTotalReward - normalizedBaseReward;
     };
 
+/**
+ * Estimates the delivery time for a courier to deliver from the midpoint.
+ * @param {BeliefBase} beliefs - The current belief base.
+ * @returns {number} The estimated delivery time.
+ */
 export const estimateCourierDeliverytime = (beliefs: BeliefBase) : number => {
     const role = beliefs.getBelief<"explorer" | "courier" | null>("role");
     if (!role || role === "courier") return 0;

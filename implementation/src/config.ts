@@ -17,27 +17,46 @@ const config = {
     ],
 };
 
+/** Number of steps the agent takes towards the center during exploration. */
 export const EXPLORATION_STEP_TOWARDS_CENTER = 2;
+
+/** Time (in ms) to wait for an agent to move before proceeding. */
 export const WAIT_FOR_AGENT_MOVE_ON = 1000;
+
+/** Maximum number of retries when an agent is blocked. */
 export const MAX_BLOCK_RETRIES = 3;
 
+/** Weight factor for distance in reward calculations. */
 export const DISTANCE_WEIGHT = 1.5;
+
+/** Weight factor for reward evaluation. */
 export const REWARD_WEIGHT = 1;
 
-export const AGGRESSIVE_DISTANCE_WEIGHT = 1.17; // should be 1.1 < x < 1.3
+/** Distance weight used in aggressive agent strategy (should be between 1.1 and 1.3). */
+export const AGGRESSIVE_DISTANCE_WEIGHT = 1.17;
 
+/** Reward weight used in specific agent strategies (e.g., support agents). */
 export const S_REWARD_WEIGHT = 0.7;
+
+/** Distance weight used in specific agent strategies (e.g., support agents). */
 export const S_DISTANCE_WEIGHT = 0.5;
 
+/** Maximum distance allowed for exploration behavior. */
 export const MAX_DISTANCE_EXPLORATION = 30;
 
-export const TEST_DELAY_BETWEEN_ACTIONS = 0; // TEST TIME SHOULD BE 0, only for testing purposes
+/** Delay between actions during testing (should be 0 for proper test behavior). */
+export const TEST_DELAY_BETWEEN_ACTIONS = 0;
 
-export const COLLABORATION_TIMEOUT = 60000; // 10 seconds
-export const RESQUEST_TIMEOUT_RANGE = [0, 1000]; // from 0ms to 1s
+/** Timeout (in ms) for collaboration scenarios. */
+export const COLLABORATION_TIMEOUT = 60000;
 
+/** Random timeout range (in ms) for request handling. */
+export const RESQUEST_TIMEOUT_RANGE = [0, 1000];
+
+/** Exploration range (in units) for courier agents. */
 export const COURIER_EXPLORATION_RANGE = 7;
 
+/** Maximum number of log messages stored per agent. */
 export const MAX_AGENT_LOGS = 4;
 
 export default config;

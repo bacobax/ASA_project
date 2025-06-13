@@ -4,10 +4,7 @@ import { IntentionManager } from "./intentions";
 import { planFor, createPlanExecutor } from "./planner";
 import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { floydWarshallWithPaths } from "./utils/pathfinding";
-import {
-    getCenterDirectionTilePosition,
-    getNearestDeliverySpot,
-} from "./utils/desireUtils";
+
 import {
     MapConfig,
     Position,
@@ -21,7 +18,6 @@ import {
 } from "../types/types";
 import {
     COLLABORATION_TIMEOUT,
-    EXPLORATION_STEP_TOWARDS_CENTER,
     MAX_AGENT_LOGS,
     MAX_BLOCK_RETRIES,
     RESQUEST_TIMEOUT_RANGE,
@@ -33,18 +29,19 @@ import {
     Strategies,
     writeConfigs,
 } from "./utils/common";
-import {
-    resetBeliefsCollaboration,
-    sendAvailabilityMessage,
-    sendIntentionUpdateMessage,
-} from "./utils/commumications";
+
 import {
     calculateMidpoint,
     canReachDeliverySpot,
     canReachSpawnableSpot,
 } from "./utils/mapUtils";
-import { handleOnMessage } from "./multiAgents";
+import { handleOnMessage,sendAvailabilityMessage, sendIntentionUpdateMessage } from "./multiAgents";
 
+
+/**
+ * Represents a BDI (Belief-Desire-Intention) agent operating in the Deliveroo environment.
+ * Manages internal state, communication, planning, and decision-making processes.
+ */
 export class AgentBDI {
     private api: DeliverooApi;
 
@@ -52,25 +49,59 @@ export class AgentBDI {
     private desires = new DesireGenerator();
     private intentions = new IntentionManager();
 
+    /**
+     * Maps each atomic action to the corresponding function that sends the appropriate API call.
+     */
     private atomicActionToApi = new Map<
         atomicActions,
         (api: DeliverooApi) => Promise<any>
     >();
 
+    /**
+     * The plan currently being executed by the agent.
+     */
     private currentPlan: atomicActions[] = [];
+
+    /**
+     * Promise tracking the ongoing execution of the current plan.
+     */
     private planPromise: Promise<void> | null = null;
-    private planPromise: Promise<void> | null = null;
+
+    /**
+     * Flag used to signal that the current plan should be aborted.
+     */
     private planAbortSignal = false;
+
+    /**
+     * Timestamp of the last successful collaboration to manage timeouts.
+     */
     private lastCollaborationTime: number | null = null;
 
+    /**
+     * Timestamp of the next allowable request to avoid spamming teammates.
+     */
     private nextRequestTime = Date.now();
 
+    /**
+     * Synchronization flags used to delay the agent's decision loop until all startup data is received.
+     */
     private startSemaphore = {
+        // True when the agent's own position and ID info has been received.
         onYou: false,
+        // True when the map and associated structures have been received.
         onMap: false,
+        // True when configuration values have been received.
         onConfig: false,
     };
 
+    /**
+     * Creates an instance of the BDI agent with initial beliefs, strategy, and API bindings.
+     * @param api Deliveroo API instance for interacting with the environment.
+     * @param strategy Strategy the agent will follow (e.g., aggressive, collaborative).
+     * @param teamId The identifier for the agent's team.
+     * @param teammatesIds The identifiers of the agent's teammates.
+     * @param id The unique identifier of the agent.
+     */
     constructor(
         api: DeliverooApi,
         strategy: Strategies,
@@ -88,6 +119,9 @@ export class AgentBDI {
         this.setupSocketHandlers();
     }
 
+    /**
+     * Initializes the mapping of atomic actions to corresponding API calls.
+     */
     private initActionHandlers(): void {
         this.atomicActionToApi.set(atomicActions.moveRight, (api) =>
             api.emitMove("right")
@@ -117,6 +151,9 @@ export class AgentBDI {
             return true;
         });
     }
+    /**
+     * Starts the agent's decision-making loop after all initial data is received.
+     */
     public play(): void {
         if (
             !this.startSemaphore.onYou ||
@@ -132,6 +169,9 @@ export class AgentBDI {
             movementDuration * 2
         );
     }
+    /**
+     * Sets up socket message handlers to process agent state updates and environment changes.
+     */
     private setupSocketHandlers(): void {
         this.api.onMsg(
             handleOnMessage({
@@ -252,6 +292,10 @@ export class AgentBDI {
         });
     }
 
+    /**
+     * Determines whether the agent should request help from teammates.
+     * @returns True if help is needed, otherwise false.
+     */
     private needHelp() {
         const reachSpawnable = canReachSpawnableSpot(this.beliefs);
         const isCollaborating =
@@ -264,6 +308,9 @@ export class AgentBDI {
         return reachSpawnable && !isCollaborating && isMoveOrNull;
     }
 
+    /**
+     * Main reasoning cycle where the agent evaluates intentions and generates plans to act.
+     */
     private async deliberate(): Promise<void> {
         if (
             this.lastCollaborationTime &&
@@ -325,7 +372,6 @@ export class AgentBDI {
 
                 if (plan?.length && intention) {
                     return this.startPlanSafely(plan, intention);
-                    return this.startPlanSafely(plan, intention);
                 }
             }
 
@@ -333,6 +379,11 @@ export class AgentBDI {
         }
     }
 
+    /**
+     * Safely initiates a plan and adopts the corresponding intention.
+     * @param plan The list of atomic actions to execute.
+     * @param intention The intention that the plan fulfills.
+     */
     private async startPlanSafely(
         plan: atomicActions[],
         intention: Intention
@@ -390,6 +441,9 @@ export class AgentBDI {
         }
     }
 
+    /**
+     * Executes the current plan using the plan executor. Handles errors and updates beliefs.
+     */
     private async executePlan(): Promise<void> {
         const executor = createPlanExecutor({
             api: this.api,
@@ -427,6 +481,9 @@ export class AgentBDI {
         console.log("Plan execution completed successfully.");
         this.stopCurrentPlan();
     }
+    /**
+     * Stops the currently running plan and resets the relevant intention and flags.
+     */
     private stopCurrentPlan(): void {
         // console.log("Stopping plan.");
 
@@ -451,6 +508,11 @@ export class AgentBDI {
         this.planAbortSignal = true;
     }
 
+    /**
+     * Checks if the next move is blocked by another agent.
+     * @param action The atomic move action being evaluated.
+     * @returns True if an agent is blocking the move, otherwise false.
+     */
     private isMovingAndAgentBlocking(action: atomicActions): boolean {
         if (
             action !== atomicActions.moveDown &&

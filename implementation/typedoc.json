@@ -1,0 +1,11 @@
+{
+  "entryPoints": ["src/**"],
+  "out": "docs",
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/*.test.ts"],
+  "tsconfig": "tsconfig.json",
+  "includeVersion": false,
+  "excludePrivate": false,
+  "excludeInternal": false,
+  "theme": "default",
+  "readme": "../README.md",
+}

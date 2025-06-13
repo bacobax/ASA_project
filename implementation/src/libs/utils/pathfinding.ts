@@ -2,6 +2,16 @@ import { MapTile, MapConfig, Position, atomicActions, Agent } from "../../types/
 import { BeliefBase } from "../beliefs";
 // @ts-ignore
 import tqdm from "tqdm";
+
+/**
+ * Computes shortest paths and distances between all pairs of tiles in the map using the Floyd-Warshall algorithm.
+ * Returns distance and predecessor matrices, along with the actual paths between tiles.
+ * @param mapConfig The map configuration containing tiles, width, and height.
+ * @returns An object containing:
+ *  - dist: A 2D array where dist[i][j] is the shortest distance from tile i to tile j.
+ *  - prev: A 2D array where prev[i][j] is the predecessor of j on the shortest path from i to j.
+ *  - paths: A nested Map where paths.get(i).get(j) is the sequence of MapTiles representing the shortest path from i to j.
+ */
 export function floydWarshallWithPaths(mapConfig: MapConfig) {
     const { width, height, tiles } = mapConfig;
     const numTiles = width * height;
@@ -59,6 +69,17 @@ export function floydWarshallWithPaths(mapConfig: MapConfig) {
     return { dist, prev, paths };
 }
 
+/**
+ * Finds the shortest path from startPos to endPos on the map using the A* algorithm.
+ * Considers agents' positions as obstacles to avoid collisions.
+ * Throws an error if no path is found.
+ * @param startPos The starting position.
+ * @param endPos The target position.
+ * @param mapConfig The map configuration.
+ * @param agents Positions of agents to be considered as obstacles.
+ * @returns An array of MapTiles representing the path from startPos to endPos.
+ * @throws Error if no path can be found.
+ */
 export function aStarPath(startPos: Position, endPos: Position, mapConfig: MapConfig, agents: Position[]): MapTile[] {
     const { width, height, tiles } = mapConfig;
     const validTiles = new Map<string, MapTile>();
@@ -116,10 +137,27 @@ export function aStarPath(startPos: Position, endPos: Position, mapConfig: MapCo
     throw new Error(`No path found, from ${JSON.stringify(startPos)} to ${JSON.stringify(endPos)}`);
 }
 
+/**
+ * Calculates the Manhattan distance between two positions.
+ * This is the sum of the absolute differences of their Cartesian coordinates.
+ * @param posA The first position.
+ * @param posB The second position.
+ * @returns The Manhattan distance between posA and posB.
+ */
 function manhattanDistance(posA: Position, posB: Position): number {
     return Math.abs(posA.x - posB.x) + Math.abs(posA.y - posB.y);
 }
 
+/**
+ * Retrieves all valid neighboring tiles adjacent to the given tile that are not blocked by obstacles.
+ * Only considers neighbors within map bounds and not present in the obstacles set.
+ * @param tile The current tile.
+ * @param validTiles Map of valid tiles keyed by their coordinates.
+ * @param width Map width.
+ * @param height Map height.
+ * @param obstacles Set of coordinates representing obstacles to avoid.
+ * @returns An array of neighboring MapTiles that can be traversed.
+ */
 function getNeighbors(
     tile: MapTile,
     validTiles: Map<string, MapTile>,
@@ -149,6 +187,12 @@ function getNeighbors(
     return neighbors;
 }
 
+/**
+ * Reconstructs the path from the start tile to the current tile by backtracking through the cameFrom map.
+ * @param cameFrom A map of tile keys to their preceding MapTile on the path.
+ * @param current The current tile (usually the end tile).
+ * @returns An array of MapTiles representing the path from start to current.
+ */
 function reconstructPath(cameFrom: Map<string, MapTile>, current: MapTile): MapTile[] {
     const path: MapTile[] = [current];
     let curKey: string = `${current.x},${current.y}`;
@@ -162,6 +206,14 @@ function reconstructPath(cameFrom: Map<string, MapTile>, current: MapTile): MapT
     return path;
 }
 
+/**
+ * Converts a sequence of atomic actions into the corresponding sequence of visited tiles on the map.
+ * Starts from startPos and applies each action to update the position, collecting the resulting tile.
+ * @param startPos The starting position.
+ * @param plan An array of atomicActions representing movements.
+ * @param mapConfig The map configuration containing tiles.
+ * @returns An array of MapTiles visited in order according to the plan.
+ */
 export function getVisitedTilesFromPlan(startPos: Position, plan: atomicActions[], mapConfig: MapConfig): MapTile[] {
     const visitedTiles: MapTile[] = [];
     let currentPos: Position = { x: startPos.x, y: startPos.y };
@@ -188,6 +240,15 @@ export function getVisitedTilesFromPlan(startPos: Position, plan: atomicActions[
     return visitedTiles;
 }
 
+/**
+ * Computes the optimal path from startPos to endPos considering the current beliefs about the map and obstacles.
+ * Gathers positions of agents and teammates as obstacles to avoid collisions.
+ * Uses A* pathfinding and returns an empty path if no path is found or if start and end positions are the same.
+ * @param startPos The starting position.
+ * @param endPos The target position.
+ * @param beliefs The belief base containing map and agent information.
+ * @returns An array of MapTiles representing the optimal path, or an empty array if no path exists.
+ */
 export function getOptimalPath(
     startPos: Position,
     endPos: Position,
@@ -231,6 +292,12 @@ export function getOptimalPath(
     
 }
 
+/**
+ * Converts a sequence of MapTiles into corresponding atomic movement actions.
+ * Derives the direction of movement between consecutive tiles and maps it to the appropriate action.
+ * @param path An array of MapTiles representing a path.
+ * @returns An array of atomicActions representing movements along the path.
+ */
 export function convertPathToActions(path: MapTile[]): atomicActions[] {
     const actions: atomicActions[] = [];
     for (let i = 0; i < path.length - 1; i++) {

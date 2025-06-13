@@ -1,5 +1,3 @@
-import { AgentBDI } from "../agents";
-import { DeliverooApi } from "@unitn-asa/deliveroo-js-client";
 import { Strategies } from "./common";
 import { spawn } from 'child_process';
 
@@ -25,7 +23,13 @@ interface spawnAgentProps {
   name?: string;
 }
 
-// Spawns all agents in parallel child processes
+/**
+ * Spawns multiple agents as parallel child processes with specified configurations.
+ * Each agent is assigned a token, strategy, team ID, and optionally teammates and print permissions.
+ * This function manages team memberships and controls which agents are allowed to print output.
+ * 
+ * @param {spawnAgentsProps} params - The configuration parameters for spawning agents.
+ */
 export const spawnAgents = ({ numAgents, tokens, host, strategies, ids, teamIds = [], allowedTeamIdsPrints=[], names }: spawnAgentsProps): void => {
   if (teamIds.length < numAgents) {
     for (let i = teamIds.length; i < numAgents; i++) {
@@ -99,18 +103,31 @@ const colors = [
 
 const resetColor = "\x1b[0m";
 
+/**
+ * Returns a consistent color code string for an agent's name to colorize its output.
+ * The color is chosen by hashing the characters of the name and mapping to a predefined color list.
+ * 
+ * @param {string} name - The name of the agent.
+ * @returns {string} The ANSI color code string.
+ */
 function getColorByName(name: string): string {
   const hash = Array.from(name).reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return colors[hash % colors.length];
 }
 
-
+/**
+ * Spawns a single agent as a child process with the specified parameters.
+ * Sets up listeners to print the agent's stdout and stderr with color coding if allowed.
+ * Also logs when the agent process exits.
+ * 
+ * @param {spawnAgentProps} params - The configuration for the agent process.
+ */
 const spawnAgentProcess = ({ token, host, strategy, teamId, teammatesIds = [], allowedPrint = false, id, name }: spawnAgentProps): void => {
   const teammatesArg = teammatesIds.join(',');
   const displayName = name || id || "agent";
   const color = getColorByName(displayName);
 
-  const command = `node dist/libs/utils/agentSpawn.js host="${host}" token="${token}" strategy="${strategy}" teamId="${teamId}" teammatesIds="${teammatesArg}" id="${id}"`;
+  const command = `node dist/libs/script/agentSpawn.js host="${host}" token="${token}" strategy="${strategy}" teamId="${teamId}" teammatesIds="${teammatesArg}" id="${id}"`;
 
   const child = spawn(command, { shell: true });
 
