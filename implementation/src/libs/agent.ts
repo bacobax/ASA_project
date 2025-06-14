@@ -462,10 +462,6 @@ export class AgentBDI {
                 if (step.action === atomicActions.drop && role === "explorer") {
                     this.lastCollaborationTime = Date.now();
                 }
-                // console.log(
-                //     `[Plan] Executed ${step.action} with status: ${step.status}`
-                // );
-                // this.intentions.reviseIntentions(this.beliefs);
             }
         } catch (err) {
             if (err instanceof Error) {

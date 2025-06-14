@@ -99,7 +99,7 @@ export const aggressiveReward = (
     distance: number,
     distanceWeight: number = AGGRESSIVE_DISTANCE_WEIGHT
 ) => {
-    return (reward / distance) ^ distanceWeight;
+    return reward / ((distance) ^ distanceWeight);
 };
 
 /**

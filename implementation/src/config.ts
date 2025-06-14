@@ -35,10 +35,10 @@ export const REWARD_WEIGHT = 1;
 /** Distance weight used in "aggressive" agent strategy (should be between 1.1 and 1.3). */
 export const AGGRESSIVE_DISTANCE_WEIGHT = 1.17;
 
-/** Reward weight used in "sophisticate" agent strategy (e.g., support agents). */
+/** Reward weight used in "sophisticate" agent strategy (e.g., support agents). MUST BE IN (0,1) */
 export const S_REWARD_WEIGHT = 0.7;
 
-/** Distance weight used in "sophisticate" agent strategy (e.g., support agents). */
+/** Distance weight used in "sophisticate" agent strategy (e.g., support agents). MUST BE IN (0,1) */
 export const S_DISTANCE_WEIGHT = 0.5;
 
 /** Maximum distance allowed for exploration behavior. */

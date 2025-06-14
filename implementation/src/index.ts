@@ -30,10 +30,10 @@ spawnAgents({
     ids: ["ab132c240d1", "b132c240d19", "132c240d19f", "32c240d19fc"],
     strategies: [
         Strategies.sophisticated,
-        Strategies.sophisticated,
         Strategies.aggressive,
         Strategies.sophisticated,
+        Strategies.sophisticated,
     ],
-    teamIds: ["team-1", "team-1", "team-2", "team-2"],
+    teamIds: ["team-1", "team-2", "team-2", "team-2"],
     allowedTeamIdsPrints: ["team-1", "team-2"],
 });
