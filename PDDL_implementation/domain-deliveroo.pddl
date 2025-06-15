@@ -1,4 +1,4 @@
-;; domain file: domain-lights.pddl
+;; domain file: domain-deliveroo.pddl
 (define (domain default)
     (:requirements :strips)
     
